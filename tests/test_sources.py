@@ -1,4 +1,5 @@
 """Talking to Todoist (against a fake Todoist server) and reading desktop Outlook (with PowerShell faked)."""
+import datetime as dt
 import gc
 import json
 import subprocess
@@ -7,9 +8,11 @@ import unittest
 import urllib.parse
 import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from unittest import mock
 
-import outlook_todoist_planner as otp
+from planner import app as planner_app
+from planner import config, errors, outlook_desktop, todoist
 
 
 class FakeTodoist(ThreadingHTTPServer):
@@ -55,7 +58,7 @@ class _FakeHandler(BaseHTTPRequestHandler):
 class TodoistClientTests(unittest.TestCase):
     def setUp(self):
         self.fake = FakeTodoist()
-        self.client = otp.TodoistClient("tok123", base=self.fake.base)
+        self.client = todoist.TodoistClient("tok123", base=self.fake.base)
 
     def tearDown(self):
         self.fake.stop()
@@ -102,7 +105,7 @@ class TodoistClientTests(unittest.TestCase):
                  404: "couldn't find that task", 429: "rate-limiting", 500: "HTTP 500"}
         for status, words in cases.items():
             self.fake.routes[("GET", "/api/v1/projects")] = (status, {"error": "nope"})
-            with self.assertRaises(otp.SourceError) as cm:
+            with self.assertRaises(errors.SourceError) as cm:
                 self.client.projects()
             self.assertIn(words, str(cm.exception), status)
 
@@ -110,19 +113,19 @@ class TodoistClientTests(unittest.TestCase):
         self.fake.routes[("GET", "/api/v1/projects")] = (500, {"error": "nope"})
         with warnings.catch_warnings(record=True) as seen:
             warnings.simplefilter("always", ResourceWarning)
-            with self.assertRaises(otp.SourceError):
+            with self.assertRaises(errors.SourceError):
                 self.client.projects()
             gc.collect()
         self.assertEqual([w for w in seen if issubclass(w.category, ResourceWarning)], [])
 
     def test_unreadable_response(self):
         self.fake.routes[("GET", "/api/v1/projects")] = (200, b"<html>gateway</html>")
-        with self.assertRaisesRegex(otp.SourceError, "couldn't read"):
+        with self.assertRaisesRegex(errors.SourceError, "couldn't read"):
             self.client.projects()
 
     def test_unreachable(self):
-        client = otp.TodoistClient("t", base="http://127.0.0.1:9/api/v1")  # nothing listens on port 9
-        with self.assertRaisesRegex(otp.SourceError, "Couldn't reach Todoist"):
+        client = todoist.TodoistClient("t", base="http://127.0.0.1:9/api/v1")  # nothing listens on port 9
+        with self.assertRaisesRegex(errors.SourceError, "Couldn't reach Todoist"):
             client.projects()
 
 
@@ -137,17 +140,14 @@ class PlannerAppTodoistTests(unittest.TestCase):
             {"id": "2", "content": "Done", "project_id": "p", "checked": True},
             {"id": "3", "content": "Deleted", "project_id": "p", "is_deleted": True}]})
         self.fake.routes[("POST", "/api/v1/tasks/1")] = (200, {})
-        patcher = mock.patch.object(otp, "TODOIST_API", self.fake.base)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        # TodoistClient's default base was bound at import, so point new clients at the fake too.
-        real = otp.TodoistClient
-        patcher2 = mock.patch.object(otp, "TodoistClient", lambda token: real(token, base=self.fake.base))
+        # Point every client the app makes at the fake server.
+        real = todoist.TodoistClient
+        patcher2 = mock.patch.object(planner_app, "TodoistClient", lambda token: real(token, base=self.fake.base))
         patcher2.start()
         self.addCleanup(patcher2.stop)
-        cfg = otp.Config(otp.Path("unused.json"), memory_only=True)
+        cfg = config.Config(Path("unused.json"), memory_only=True)
         cfg.update({"todoist_token": "tok", "calendar_source": "none"})
-        self.app = otp.PlannerApp(cfg)
+        self.app = planner_app.PlannerApp(cfg)
 
     def tearDown(self):
         self.fake.stop()
@@ -171,12 +171,12 @@ class PlannerAppTodoistTests(unittest.TestCase):
 
     def test_one_failing_source_does_not_hide_the_other(self):
         self.app.cfg.update({"calendar_source": "ics", "ics_url": self.fake.base + "/missing.ics"})
-        out = self.app.data(otp.dt.date(2026, 11, 9), otp.dt.date(2026, 11, 16), force=False)
+        out = self.app.data(dt.date(2026, 11, 9), dt.date(2026, 11, 16), force=False)
         self.assertEqual(len(out["tasks"]), 1)
         self.assertEqual([e["source"] for e in out["errors"]], ["calendar"])
 
     def test_no_notice_when_every_zone_is_known(self):
-        out = self.app.data(otp.dt.date(2026, 11, 9), otp.dt.date(2026, 11, 16), force=False)
+        out = self.app.data(dt.date(2026, 11, 9), dt.date(2026, 11, 16), force=False)
         self.assertEqual(out["errors"], [])
 
     def test_unknown_zones_from_tasks_and_calendar_are_reported_once(self):
@@ -188,28 +188,28 @@ class PlannerAppTodoistTests(unittest.TestCase):
         self.fake.routes[("GET", "/cal.ics")] = (200, cal)
         self.app.cfg.update({"calendar_source": "ics",
                              "ics_url": f"http://127.0.0.1:{self.fake.server_address[1]}/cal.ics"})
-        out = self.app.data(otp.dt.date(2026, 11, 9), otp.dt.date(2026, 11, 16), force=False)
+        out = self.app.data(dt.date(2026, 11, 9), dt.date(2026, 11, 16), force=False)
         [notice] = out["errors"]
         self.assertEqual(notice["source"], "timezones")
         self.assertIn("Mars/Olympus, Venus/Maxwell", notice["message"])
         # Switching the calendar off drops its part of the notice.
         self.app.cfg.update({"calendar_source": "none"})
-        out = self.app.data(otp.dt.date(2026, 11, 9), otp.dt.date(2026, 11, 16), force=False)
+        out = self.app.data(dt.date(2026, 11, 9), dt.date(2026, 11, 16), force=False)
         self.assertIn("(Mars/Olympus)", out["errors"][0]["message"])
 
     def test_no_token_means_no_tasks_and_a_clear_error_on_actions(self):
-        cfg = otp.Config(otp.Path("unused.json"), memory_only=True)
-        app = otp.PlannerApp(cfg)
+        cfg = config.Config(Path("unused.json"), memory_only=True)
+        app = planner_app.PlannerApp(cfg)
         self.assertEqual(app.tasks(force=False), [])
-        with self.assertRaisesRegex(otp.SourceError, "Add your Todoist API token"):
+        with self.assertRaisesRegex(errors.SourceError, "Add your Todoist API token"):
             app.close_task("1")
 
 
 class IcsDownloadTests(unittest.TestCase):
     def setUp(self):
         self.fake = FakeTodoist()  # any small server will do
-        cfg = otp.Config(otp.Path("unused.json"), memory_only=True)
-        self.app = otp.PlannerApp(cfg)
+        cfg = config.Config(Path("unused.json"), memory_only=True)
+        self.app = planner_app.PlannerApp(cfg)
         self.cfg = cfg
 
     def tearDown(self):
@@ -223,7 +223,7 @@ class IcsDownloadTests(unittest.TestCase):
                "END:VEVENT\r\nEND:VCALENDAR\r\n").encode()
         self.fake.routes[("GET", "/cal.ics")] = (200, cal)
         self.cfg.update({"ics_url": self.url("/cal.ics")})
-        d0, d1 = otp.dt.date(2026, 11, 10), otp.dt.date(2026, 11, 11)
+        d0, d1 = dt.date(2026, 11, 10), dt.date(2026, 11, 11)
         self.assertEqual([e["title"] for e in self.app.events(d0, d1, force=False)], ["Hi"])
         self.app.events(d0, d1, force=False)
         self.app.events(d0, d1, force=True)  # a forced refresh within 15 seconds still uses the copy
@@ -231,8 +231,8 @@ class IcsDownloadTests(unittest.TestCase):
 
     def test_webcal_links_are_fetched_over_https(self):
         self.cfg.update({"ics_url": "webcal://outlook.office365.com/owa/calendar/x/calendar.ics"})
-        with mock.patch.object(otp, "http_request", return_value=(200, b"BEGIN:VCALENDAR\r\nEND:VCALENDAR")) as req:
-            self.app.events(otp.dt.date(2026, 11, 10), otp.dt.date(2026, 11, 11), force=False)
+        with mock.patch.object(planner_app, "http_request", return_value=(200, b"BEGIN:VCALENDAR\r\nEND:VCALENDAR")) as req:
+            self.app.events(dt.date(2026, 11, 10), dt.date(2026, 11, 11), force=False)
         self.assertEqual(req.call_args[0][1], "https://outlook.office365.com/owa/calendar/x/calendar.ics")
 
     def test_explains_bad_links(self):
@@ -241,24 +241,24 @@ class IcsDownloadTests(unittest.TestCase):
                  "not a url": "doesn't look like a web address"}
         for url, words in cases.items():
             self.cfg.update({"ics_url": url})
-            with self.assertRaises(otp.SourceError) as cm:
-                self.app.events(otp.dt.date(2026, 11, 10), otp.dt.date(2026, 11, 11), force=False)
+            with self.assertRaises(errors.SourceError) as cm:
+                self.app.events(dt.date(2026, 11, 10), dt.date(2026, 11, 11), force=False)
             self.assertIn(words, str(cm.exception), url)
 
 
 def fake_powershell(stdout: str, returncode=0, stderr=""):
-    return mock.patch.object(otp.subprocess, "run", return_value=subprocess.CompletedProcess(
+    return mock.patch.object(outlook_desktop.subprocess, "run", return_value=subprocess.CompletedProcess(
         [], returncode, stdout.encode("utf-8"), stderr.encode("utf-8")))
 
 
 class OutlookDesktopTests(unittest.TestCase):
     def setUp(self):
-        p = mock.patch.object(otp.sys, "platform", "win32")
+        p = mock.patch.object(outlook_desktop.sys, "platform", "win32")
         p.start()
         self.addCleanup(p.stop)
 
     def read(self):
-        return otp.outlook_desktop_events(otp.dt.date(2026, 11, 9), otp.dt.date(2026, 11, 16))
+        return outlook_desktop.outlook_desktop_events(dt.date(2026, 11, 9), dt.date(2026, 11, 16))
 
     def test_converts_appointments(self):
         rows = [
@@ -284,15 +284,15 @@ class OutlookDesktopTests(unittest.TestCase):
 
     def test_explains_failures(self):
         with fake_powershell("", 1, "Retrieving the COM class factory failed\nmore"):
-            with self.assertRaisesRegex(otp.SourceError, "classic Outlook.*COM class factory"):
+            with self.assertRaisesRegex(errors.SourceError, "classic Outlook.*COM class factory"):
                 self.read()
-        with mock.patch.object(otp.subprocess, "run", side_effect=subprocess.TimeoutExpired("ps", 120)):
-            with self.assertRaisesRegex(otp.SourceError, "took too long"):
+        with mock.patch.object(outlook_desktop.subprocess, "run", side_effect=subprocess.TimeoutExpired("ps", 120)):
+            with self.assertRaisesRegex(errors.SourceError, "took too long"):
                 self.read()
 
     def test_only_on_windows(self):
-        with mock.patch.object(otp.sys, "platform", "darwin"):
-            with self.assertRaisesRegex(otp.SourceError, "only works on Windows"):
+        with mock.patch.object(outlook_desktop.sys, "platform", "darwin"):
+            with self.assertRaisesRegex(errors.SourceError, "only works on Windows"):
                 self.read()
 
 

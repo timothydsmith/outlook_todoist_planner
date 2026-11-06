@@ -2,7 +2,8 @@
 import datetime as dt
 import unittest
 
-import outlook_todoist_planner as otp
+from planner import demo
+from planner import ics as ical
 from tests.support import AUS_EASTERN, has_zone, ics, local_from_utc
 
 D = dt.datetime
@@ -11,51 +12,51 @@ D = dt.datetime
 class LowLevelParsingTests(unittest.TestCase):
     def test_unfold_lines(self):
         text = "SUMMARY:Long\r\n  title\r\n\tcontinued\r\n\r\nLOCATION:Room\nDESCRIPTION:x\rEND:VEVENT"
-        self.assertEqual(otp.unfold_lines(text),
+        self.assertEqual(ical.unfold_lines(text),
                          ["SUMMARY:Long titlecontinued", "LOCATION:Room", "DESCRIPTION:x", "END:VEVENT"])
 
     def test_content_line_with_params_and_quoted_colon(self):
-        name, params, value = otp.parse_content_line(
+        name, params, value = ical.parse_content_line(
             'DTSTART;TZID="(UTC+10:00) Canberra, Melbourne";VALUE=DATE-TIME:20261110T090000')
         self.assertEqual(name, "DTSTART")
         self.assertEqual(params, {"TZID": "(UTC+10:00) Canberra, Melbourne", "VALUE": "DATE-TIME"})
         self.assertEqual(value, "20261110T090000")
 
     def test_content_line_edge_cases(self):
-        self.assertEqual(otp.parse_content_line("item1.summary:Hi")[0], "SUMMARY")
-        self.assertEqual(otp.parse_content_line("URL:https://x.test/a:b")[2], "https://x.test/a:b")
-        self.assertIsNone(otp.parse_content_line("no colon here"))
-        self.assertIsNone(otp.parse_content_line(":starts with colon"))
+        self.assertEqual(ical.parse_content_line("item1.summary:Hi")[0], "SUMMARY")
+        self.assertEqual(ical.parse_content_line("URL:https://x.test/a:b")[2], "https://x.test/a:b")
+        self.assertIsNone(ical.parse_content_line("no colon here"))
+        self.assertIsNone(ical.parse_content_line(":starts with colon"))
 
     def test_unescape_text(self):
-        self.assertEqual(otp.unescape_text(r"Budget\, planning\; Q1\nRoom 2\\3"), "Budget, planning; Q1\nRoom 2\\3")
+        self.assertEqual(ical.unescape_text(r"Budget\, planning\; Q1\nRoom 2\\3"), "Budget, planning; Q1\nRoom 2\\3")
 
     def test_parse_dt_value(self):
-        self.assertEqual(otp.parse_dt_value("20261110", {}), dt.date(2026, 11, 10))
-        self.assertEqual(otp.parse_dt_value("20261110T090000Z", {}).utcoffset(), dt.timedelta(0))
-        floating = otp.parse_dt_value("20261110T0900", {})
+        self.assertEqual(ical.parse_dt_value("20261110", {}), dt.date(2026, 11, 10))
+        self.assertEqual(ical.parse_dt_value("20261110T090000Z", {}).utcoffset(), dt.timedelta(0))
+        floating = ical.parse_dt_value("20261110T0900", {})
         self.assertEqual(floating, D(2026, 11, 10, 9, 0))
         self.assertIsNone(floating.tzinfo)
         tz = dt.timezone(dt.timedelta(hours=10))
-        self.assertIs(otp.parse_dt_value("20261110T090000", {"TZID": "X"}, lambda _: tz).tzinfo, tz)
+        self.assertIs(ical.parse_dt_value("20261110T090000", {"TZID": "X"}, lambda _: tz).tzinfo, tz)
         with self.assertRaises(ValueError):
-            otp.parse_dt_value("2026-11-10", {})
+            ical.parse_dt_value("2026-11-10", {})
 
     def test_parse_duration(self):
-        self.assertEqual(otp.parse_duration("PT1H30M"), dt.timedelta(minutes=90))
-        self.assertEqual(otp.parse_duration("P1D"), dt.timedelta(days=1))
-        self.assertEqual(otp.parse_duration("P2W"), dt.timedelta(weeks=2))
-        self.assertEqual(otp.parse_duration("-PT15M"), -dt.timedelta(minutes=15))
+        self.assertEqual(ical.parse_duration("PT1H30M"), dt.timedelta(minutes=90))
+        self.assertEqual(ical.parse_duration("P1D"), dt.timedelta(days=1))
+        self.assertEqual(ical.parse_duration("P2W"), dt.timedelta(weeks=2))
+        self.assertEqual(ical.parse_duration("-PT15M"), -dt.timedelta(minutes=15))
         with self.assertRaises(ValueError):
-            otp.parse_duration("1 hour")
+            ical.parse_duration("1 hour")
 
     def test_parse_offset(self):
-        self.assertEqual(otp.parse_offset("+1100"), dt.timedelta(hours=11))
-        self.assertEqual(otp.parse_offset("-0530"), -dt.timedelta(hours=5, minutes=30))
-        self.assertEqual(otp.parse_offset("+013045"), dt.timedelta(hours=1, minutes=30, seconds=45))
+        self.assertEqual(ical.parse_offset("+1100"), dt.timedelta(hours=11))
+        self.assertEqual(ical.parse_offset("-0530"), -dt.timedelta(hours=5, minutes=30))
+        self.assertEqual(ical.parse_offset("+013045"), dt.timedelta(hours=1, minutes=30, seconds=45))
 
     def test_parse_rrule(self):
-        r = otp.parse_rrule("FREQ=monthly;INTERVAL=2;BYDAY=2TU,-1FR,MO;COUNT=5;BYSETPOS=-1;WKST=SU;JUNK")
+        r = ical.parse_rrule("FREQ=monthly;INTERVAL=2;BYDAY=2TU,-1FR,MO;COUNT=5;BYSETPOS=-1;WKST=SU;JUNK")
         self.assertEqual(r["FREQ"], "MONTHLY")
         self.assertEqual(r["INTERVAL"], 2)
         self.assertEqual(r["COUNT"], 5)
@@ -64,12 +65,12 @@ class LowLevelParsingTests(unittest.TestCase):
         self.assertEqual(r["WKST"], 6)
 
     def test_bad_rrule_parts_are_ignored(self):
-        r = otp.parse_rrule("FREQ=DAILY;INTERVAL=abc;COUNT=x")
+        r = ical.parse_rrule("FREQ=DAILY;INTERVAL=abc;COUNT=x")
         self.assertEqual((r["FREQ"], r["INTERVAL"], r["COUNT"]), ("DAILY", 1, None))
 
 
 def expand(start, rule, ws, we, until=None):
-    return otp.expand_rrule(start, otp.parse_rrule(rule), ws, we, until)
+    return ical.expand_rrule(start, ical.parse_rrule(rule), ws, we, until)
 
 
 class RepeatRuleTests(unittest.TestCase):
@@ -130,8 +131,8 @@ class RepeatRuleTests(unittest.TestCase):
 
 class FeedTimezoneTests(unittest.TestCase):
     def setUp(self):
-        comp = next(otp.parse_components(AUS_EASTERN).walk("VTIMEZONE"))
-        self.tz = otp.VTimezone("AUS Eastern Standard Time", comp)
+        comp = next(ical.parse_components(AUS_EASTERN).walk("VTIMEZONE"))
+        self.tz = ical.VTimezone("AUS Eastern Standard Time", comp)
 
     def off(self, *args):
         return self.tz.utcoffset(D(*args)) / dt.timedelta(hours=1)
@@ -154,7 +155,7 @@ class FeedTimezoneTests(unittest.TestCase):
 
 
 def between(text, start, end):
-    return otp.ICalendar(text).events_between(start, end)
+    return ical.ICalendar(text).events_between(start, end)
 
 
 class EventsBetweenTests(unittest.TestCase):
@@ -233,7 +234,7 @@ class EventsBetweenTests(unittest.TestCase):
         self.assertEqual(titles, ["(No title)", "Budget, planning"])
 
     def test_broken_events_are_skipped_not_fatal(self):
-        cal = otp.ICalendar(ics("UID:bad\nSUMMARY:Bad\nDTSTART:tomorrow",
+        cal = ical.ICalendar(ics("UID:bad\nSUMMARY:Bad\nDTSTART:tomorrow",
                                 "UID:ok\nSUMMARY:Fine\nDTSTART:20261110T090000"))
         self.assertEqual(cal.skipped, 1)
         self.assertEqual([e["title"] for e in cal.events_between(dt.date(2026, 11, 10), dt.date(2026, 11, 11))],
@@ -269,13 +270,13 @@ class EventsInFeedTimezoneTests(unittest.TestCase):
                                   local_from_utc(2026, 11, 22, 23)])
 
     def test_unknown_timezone_is_treated_as_local_and_reported(self):
-        cal = otp.ICalendar(ics("UID:1\nSUMMARY:X\nDTSTART;TZID=Mars/Olympus:20261110T090000"))
+        cal = ical.ICalendar(ics("UID:1\nSUMMARY:X\nDTSTART;TZID=Mars/Olympus:20261110T090000"))
         [ev] = cal.events_between(dt.date(2026, 11, 10), dt.date(2026, 11, 11))
         self.assertEqual(ev["start"], "2026-11-10T09:00")
         self.assertEqual(cal.unknown_zones, {"Mars/Olympus"})
 
     def test_zones_defined_in_the_feed_or_utc_are_not_reported(self):
-        cal = otp.ICalendar(ics("UID:1\nSUMMARY:X\nDTSTART;TZID=AUS Eastern Standard Time:20261110T090000",
+        cal = ical.ICalendar(ics("UID:1\nSUMMARY:X\nDTSTART;TZID=AUS Eastern Standard Time:20261110T090000",
                                 "UID:2\nSUMMARY:Y\nDTSTART;TZID=UTC:20261110T090000\nDTEND:20261110T100000Z",
                                 timezones=AUS_EASTERN))
         self.assertEqual(cal.unknown_zones, set())
@@ -291,7 +292,7 @@ class DemoCalendarTests(unittest.TestCase):
     def test_demo_week(self):
         today = dt.date(2026, 11, 6)
         monday = today - dt.timedelta(days=today.weekday())
-        evs = otp.ICalendar(otp.demo_ics(today)).events_between(monday, monday + dt.timedelta(days=7))
+        evs = ical.ICalendar(demo.demo_ics(today)).events_between(monday, monday + dt.timedelta(days=7))
         titles = [e["title"] for e in evs]
         self.assertEqual(titles.count("Team check-in"), 3)  # Mon, Wed, Fri: Tue moved, Thu skipped
         self.assertEqual(titles.count("Team check-in (moved)"), 1)

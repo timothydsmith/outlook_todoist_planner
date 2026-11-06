@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="planner-token" content="__PLANNER_TOKEN__">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='24' rx='4' fill='%2324405F'/%3E%3Crect x='3' y='5' width='26' height='7' rx='3' fill='%23F0B23A'/%3E%3Cpath d='M10 20l4 4 8-9' stroke='%23fff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="bar">
+  <div class="nav">
+    <button class="icon only-narrow" data-act="side" aria-label="Show task lists" title="Task lists">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 4h10M3 8h10M3 12h7"/></svg></button>
+    <button class="icon" data-act="prev" aria-label="Previous" title="Previous (←)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg></button>
+    <button class="icon" data-act="next" aria-label="Next" title="Next (→)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"/></svg></button>
+    <button class="btn" data-act="today" title="Today (T)">Today</button>
+  </div>
+  <h1 id="range" aria-live="polite"></h1>
+  <div class="tools">
+    <div class="seg" role="group" aria-label="View">
+      <button data-view="day" aria-pressed="false" title="Day view (D)">Day</button><button data-view="week" aria-pressed="true" title="Week view (W)">Week</button>
+    </div>
+    <span id="status" class="status"></span>
+    <button class="icon" data-act="refresh" aria-label="Refresh" title="Refresh (R)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg></button>
+    <button class="icon" data-act="settings" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  </div>
+</header>
+<div id="banner" class="banner" hidden></div>
+<div class="main">
+  <aside class="side" id="side" aria-label="Task lists"></aside>
+  <section class="cal" id="cal">
+    <div class="cal-head" id="calHead"></div>
+    <div class="scroller" id="scroller"><div class="grid" id="grid"></div></div>
+  </section>
+</div>
+<div id="pop" class="pop" role="dialog" hidden></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<dialog id="settings" aria-labelledby="settingsTitle">
+  <form method="dialog" id="settingsForm" novalidate>
+    <h2 id="settingsTitle">Settings</h2>
+    <p class="intro" id="settingsIntro" hidden>Connect Todoist and your Outlook calendar to get started. Everything stays on this computer, apart from the requests the app makes to Todoist and Outlook.</p>
+    <p class="form-error" id="settingsError" hidden></p>
+    <fieldset>
+      <legend>Todoist</legend>
+      <label class="f"><span>API token</span>
+        <input type="password" name="todoist_token" autocomplete="off" spellcheck="false" placeholder="Paste your token">
+      </label>
+      <p class="help" id="tokenHelp">In Todoist, open Settings › Integrations › Developer and copy the API token.</p>
+      <label class="f" style="margin-top:10px"><span>Only show tasks matching a filter (optional)</span>
+        <input type="text" name="todoist_filter" spellcheck="false" placeholder="For example: #Work | @work">
+      </label>
+      <p class="help">Uses Todoist's own filter syntax. Leave blank to show every task.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Outlook calendar</legend>
+      <label class="radio"><input type="radio" name="calendar_source" value="ics">
+        <span>Published calendar link<small>Works on Windows and Mac. In Outlook on the web, go to Settings › Calendar › Shared calendars › Publish a calendar, choose your calendar and a detail level, then copy the ICS link.</small></span></label>
+      <label class="radio" id="desktopOption"><input type="radio" name="calendar_source" value="outlook_desktop">
+        <span>Outlook desktop app on this PC<small>Windows with classic Outlook only. Reads your calendar straight from Outlook, so nothing is published.</small></span></label>
+      <label class="radio"><input type="radio" name="calendar_source" value="none">
+        <span>No calendar<small>Show Todoist tasks only.</small></span></label>
+      <label class="f" id="icsField" style="margin-top:8px"><span>ICS link</span>
+        <input type="url" name="ics_url" spellcheck="false" placeholder="https://outlook.office365.com/owa/calendar/…/calendar.ics">
+      </label>
+      <p class="help" id="icsHelp">Anyone who has this link can see what you published, so keep it to yourself. "Can view titles and locations" is enough for this app.</p>
+    </fieldset>
+    <fieldset>
+      <legend>View</legend>
+      <div class="cols">
+        <label class="f"><span>Week starts on</span>
+          <select name="week_start"><option value="1">Monday</option><option value="0">Sunday</option></select></label>
+        <label class="f"><span>Scroll to</span>
+          <select name="day_start_hour"></select></label>
+        <label class="f"><span>Default task length</span>
+          <select name="default_task_minutes"><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">1.5 hours</option></select></label>
+        <label class="f"><span>Refresh every</span>
+          <select name="refresh_minutes"><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></label>
+      </div>
+      <label class="check-row"><input type="checkbox" name="show_weekends"> Show weekends</label>
+    </fieldset>
+    <div class="dialog-actions">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" id="saveSettings" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>

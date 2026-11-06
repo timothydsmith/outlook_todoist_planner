@@ -23,19 +23,27 @@ Keyboard: ← and → move between weeks, **T** goes to today, **D** and **W** s
 
 ## Running it
 
-**Windows:** keep both files in one folder and double-click `Start Planner.bat`. Or run:
+**Windows:** double-click `Start Planner.bat`. Or open a terminal in the folder and run:
 
 ```
-python outlook_todoist_planner.py
+py -m planner
 ```
 
-**Mac:** open Terminal in the folder and run `python3 outlook_todoist_planner.py`.
+**Mac:** open Terminal in the folder and run `python3 -m planner`.
+
+Keep the whole folder together: the app's code lives in the `planner` folder. (`python outlook_todoist_planner.py` still works too.)
 
 On first launch, the Settings screen opens. Paste your Todoist token, choose how to read Outlook, and select Save.
 
-To try it with sample data first, run `python outlook_todoist_planner.py --demo`.
+To try it with sample data first, run `py -m planner --demo`.
 
 When you close the window, the app stops on its own. For a desktop shortcut on Windows, right-click `Start Planner.bat` › Send to › Desktop.
+
+## For developers
+
+- `planner/` holds the Python code, one module per area: `todoist.py`, `ics.py` (calendar files), `outlook_desktop.py`, `app.py` (fetching and caching), `server.py` (the local web server), and `window.py`.
+- `planner/ui/` holds the page itself: `index.html`, `app.js` and `styles.css`. The server reads them on each request, so a browser refresh picks up any edits.
+- Run the tests with `py -m unittest` (Mac: `python3 -m unittest`). They use only the standard library and need no accounts.
 
 ## Good to know
 

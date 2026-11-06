@@ -4,16 +4,18 @@ import http.client
 import json
 import threading
 import unittest
+from pathlib import Path
 
-import outlook_todoist_planner as otp
+from planner import app as planner_app
+from planner import config, server
 
 TOKEN = "test-token-abc"
 
 
 class ServerTests(unittest.TestCase):
     def setUp(self):
-        cfg = otp.Config(otp.Path("unused.json"), memory_only=True)
-        self.server = otp.PlannerServer(("127.0.0.1", 0), otp.PlannerApp(cfg, demo=True), TOKEN, keep_running=True)
+        cfg = config.Config(Path("unused.json"), memory_only=True)
+        self.server = server.PlannerServer(("127.0.0.1", 0), planner_app.PlannerApp(cfg, demo=True), TOKEN, keep_running=True)
         self.port = self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
         today = dt.date.today()
@@ -52,8 +54,19 @@ class ServerTests(unittest.TestCase):
     def test_page_gets_the_token_written_in(self):
         status, html = self.call("GET", "/", token=None)
         self.assertEqual(status, 200)
-        self.assertIn(f'const TOKEN = "{TOKEN}"', html)
+        self.assertIn(f'<meta name="planner-token" content="{TOKEN}">', html)
         self.assertNotIn("__PLANNER_TOKEN__", html)
+
+    def test_page_files(self):
+        status, js = self.call("GET", "/app.js", token=None)
+        self.assertEqual(status, 200)
+        self.assertIn('meta[name="planner-token"]', js)
+        self.assertNotIn(TOKEN, js)
+        self.assertEqual(self.call("GET", "/styles.css", token=None)[0], 200)
+
+    def test_nothing_else_on_disk_is_served(self):
+        for path in ("/ui/app.js", "/config.py", "/../README.md", "/%2e%2e/README.md", "/index.html/../config.py"):
+            self.assertEqual(self.call("GET", path, token=None)[0], 404, path)
 
     def test_localhost_name_is_allowed(self):
         self.assertEqual(self.call("GET", "/health", token=None, host=f"localhost:{self.port}")[0], 200)
