@@ -20,7 +20,7 @@ from .demo import DEMO_PROJECTS, demo_ics, demo_tasks
 from .errors import SourceError, _reason
 from .ics import ICalendar
 from .net import http_request
-from .outlook_desktop import outlook_desktop_events
+from .outlook import OutlookBridge, rows_to_events
 from .todoist import TodoistClient, normalize_task, schedule_payload
 
 
@@ -112,25 +112,43 @@ class IcsCalendar(CalendarSource):
 
 
 class OutlookDesktopCalendar(CalendarSource):
-    """Classic Outlook on this PC, read through PowerShell. Results are kept per date range."""
+    """Classic Outlook on this PC, run in the background (no window) through a long-lived helper.
 
-    def __init__(self, cfg: Config):
+    Results are kept per date range. A result read before Outlook had connected to the server
+    isn't kept, so the next refresh tries again, and the yellow bar says it may be out of date.
+    """
+
+    NOT_CONNECTED = "Outlook hasn't connected to the server yet, so meetings may be out of date."
+
+    def __init__(self, cfg: Config, bridge: OutlookBridge | None = None):
         self.cfg = cfg
+        self.bridge = bridge or OutlookBridge()
         self._cache: dict = {}
+        self._connected = True
 
     def events(self, start, end, force):
         key = (start, end)
         hit = self._cache.get(key)
         if hit and not force and time.time() - hit[0] < _ttl(self.cfg):
+            self._connected = True
             return hit[1]
-        evs = outlook_desktop_events(start, end)
-        if len(self._cache) > 20:
-            self._cache.clear()
-        self._cache[key] = (time.time(), evs)
+        resp = self.bridge.request("events", start=start.isoformat(), end=end.isoformat())
+        evs = rows_to_events(resp.get("rows") or [])
+        self._connected = bool(resp.get("connected", True))
+        if self._connected:
+            if len(self._cache) > 20:
+                self._cache.clear()
+            self._cache[key] = (time.time(), evs)
         return evs
+
+    def notices(self):
+        return [] if self._connected else [{"source": "calendar", "message": self.NOT_CONNECTED}]
 
     def reset(self):
         self._cache.clear()
+
+    def close(self):
+        self.bridge.close()
 
 
 # --------------------------------------------------------------------------

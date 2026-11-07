@@ -51,6 +51,7 @@ def main(argv=None) -> int:
         print("\nStopped.")
     finally:
         server.server_close()
+        app.close()  # lets the Outlook helper close the background Outlook it started
     return 0
 
 

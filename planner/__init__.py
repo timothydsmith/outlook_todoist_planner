@@ -12,7 +12,7 @@ only Python 3.9+ and its standard library.
 Where the data comes from
   Todoist   your personal API token (Todoist > Settings > Integrations > Developer)
   Outlook   either the ICS link from "Publish a calendar" in Outlook on the web,
-            or (Windows only) the classic Outlook desktop app already on your PC
+            or (Windows only) classic Outlook, which the app runs in the background with no window
 
 Settings are saved in a small JSON file in your user profile (see config_path()).
 Your Todoist token is stored there in plain text, readable only by your account.

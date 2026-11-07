@@ -11,7 +11,7 @@ from pathlib import Path
 DEFAULTS = {
     "todoist_token": "",
     "todoist_filter": "",
-    "calendar_source": "ics",          # "ics" | "outlook_desktop" | "none"
+    "calendar_source": "outlook_desktop" if sys.platform == "win32" else "ics",  # "ics" | "outlook_desktop" | "none"
     "ics_url": "",
     "week_start": 1,                   # 1 = Monday, 0 = Sunday
     "show_weekends": True,

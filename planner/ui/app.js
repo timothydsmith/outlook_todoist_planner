@@ -665,6 +665,6 @@ setInterval(() => { const d = ymd(new Date()); if (d !== lastDay) { lastDay = d;
   }
   render(); restartTimers();
   const s = state.settings;
-  if (s && !s.demo && !s.has_token && (s.calendar_source === "none" || (s.calendar_source === "ics" && !s.ics_url))) openSettings(true);
+  if (s && !s.demo && !s.has_token) openSettings(true);
   load();
 })();

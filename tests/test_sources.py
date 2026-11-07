@@ -1,8 +1,7 @@
-"""Talking to Todoist (against a fake Todoist server) and reading desktop Outlook (with PowerShell faked)."""
+"""Talking to Todoist (against a fake Todoist server), downloading calendar links, and choosing sources."""
 import datetime as dt
 import gc
 import json
-import subprocess
 import threading
 import unittest
 import urllib.parse
@@ -12,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 from planner import app as planner_app
-from planner import config, errors, outlook_desktop, sources, todoist
+from planner import config, errors, sources, todoist
 
 
 class FakeTodoist(ThreadingHTTPServer):
@@ -209,6 +208,7 @@ class IcsDownloadTests(unittest.TestCase):
     def setUp(self):
         self.fake = FakeTodoist()  # any small server will do
         cfg = config.Config(Path("unused.json"), memory_only=True)
+        cfg.update({"calendar_source": "ics"})
         self.app = planner_app.PlannerApp(cfg)
         self.cfg = cfg
 
@@ -296,56 +296,6 @@ class SourceSelectionTests(unittest.TestCase):
             cal.close = lambda name=name: closed.append(name)
         self.app.close()
         self.assertEqual(sorted(closed), ["ics", "none", "outlook_desktop"])
-
-
-def fake_powershell(stdout: str, returncode=0, stderr=""):
-    return mock.patch.object(outlook_desktop.subprocess, "run", return_value=subprocess.CompletedProcess(
-        [], returncode, stdout.encode("utf-8"), stderr.encode("utf-8")))
-
-
-class OutlookDesktopTests(unittest.TestCase):
-    def setUp(self):
-        p = mock.patch.object(outlook_desktop.sys, "platform", "win32")
-        p.start()
-        self.addCleanup(p.stop)
-
-    def read(self):
-        return outlook_desktop.outlook_desktop_events(dt.date(2026, 11, 9), dt.date(2026, 11, 16))
-
-    def test_converts_appointments(self):
-        rows = [
-            {"id": "E1|x", "title": "Board", "start": "2026-11-10T10:00:00", "end": "2026-11-10T11:00:00",
-             "allDay": False, "location": "https://teams.microsoft.com/l/meetup-join/1 Room", "busy": 2},
-            {"id": "E2|x", "title": "Leave", "start": "2026-11-12T00:00:00", "end": "2026-11-12T00:00:00",
-             "allDay": True, "location": "", "busy": 3},
-            {"id": "E3|x", "title": "Cancelled: Demo", "start": "2026-11-13T09:00:00", "end": "2026-11-13T09:30:00",
-             "allDay": False, "location": "", "busy": 0},
-            {"title": "Broken", "start": "garbage", "end": "2026-11-13T09:30:00"},
-        ]
-        with fake_powershell("﻿" + json.dumps(rows)) as run:
-            board, leave, demo = self.read()
-        script = run.call_args[0][0][-1]
-        self.assertIn("2026-11-09", script)
-        self.assertIn("2026-11-16", script)
-        self.assertEqual((board["start"], board["end"], board["busy"]), ("2026-11-10T10:00", "2026-11-10T11:00", "busy"))
-        self.assertEqual(board["url"], "https://teams.microsoft.com/l/meetup-join/1")
-        self.assertEqual((leave["allDay"], leave["start"], leave["end"], leave["busy"]),
-                         (True, "2026-11-12", "2026-11-13", "oof"))
-        self.assertTrue(demo["cancelled"])
-        self.assertEqual(demo["busy"], "free")
-
-    def test_explains_failures(self):
-        with fake_powershell("", 1, "Retrieving the COM class factory failed\nmore"):
-            with self.assertRaisesRegex(errors.SourceError, "classic Outlook.*COM class factory"):
-                self.read()
-        with mock.patch.object(outlook_desktop.subprocess, "run", side_effect=subprocess.TimeoutExpired("ps", 120)):
-            with self.assertRaisesRegex(errors.SourceError, "took too long"):
-                self.read()
-
-    def test_only_on_windows(self):
-        with mock.patch.object(outlook_desktop.sys, "platform", "darwin"):
-            with self.assertRaisesRegex(errors.SourceError, "only works on Windows"):
-                self.read()
 
 
 if __name__ == "__main__":
