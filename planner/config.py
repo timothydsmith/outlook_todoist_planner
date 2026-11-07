@@ -18,6 +18,9 @@ DEFAULTS = {
     "day_start_hour": 7,
     "default_task_minutes": 30,
     "refresh_minutes": 5,
+    "outlook_writeback": False,        # add timed tasks to Outlook as events (needs "outlook_desktop")
+    "outlook_show_as": "busy",         # "busy" | "tentative" | "free"
+    "outlook_writeback_days": 14,      # how far ahead new task events are made
 }
 
 
@@ -82,8 +85,12 @@ class Config:
                 v = str(v or "").strip()
             elif k == "calendar_source":
                 v = v if v in ("ics", "outlook_desktop", "none") else "ics"
-            elif k == "show_weekends":
+            elif k in ("show_weekends", "outlook_writeback"):
                 v = bool(v)
+            elif k == "outlook_show_as":
+                v = v if v in ("busy", "tentative", "free") else "busy"
+            elif k == "outlook_writeback_days":
+                v = min(60, max(1, int(v)))
             elif k == "week_start":
                 v = 0 if int(v) == 0 else 1
             elif k == "day_start_hour":

@@ -71,6 +71,18 @@
       </label>
       <p class="help" id="icsHelp">Anyone who has this link can see what you published, so keep it to yourself. "Can view titles and locations" is enough for this app.</p>
     </fieldset>
+    <fieldset id="writebackSet">
+      <legend>Tasks in Outlook</legend>
+      <label class="check-row"><input type="checkbox" name="outlook_writeback"> Add timed tasks to my Outlook calendar</label>
+      <div class="cols">
+        <label class="f"><span>Show me as</span>
+          <select name="outlook_show_as"><option value="busy">Busy</option><option value="tentative">Tentative</option><option value="free">Free</option></select></label>
+        <label class="f"><span>Add them up to</span>
+          <select name="outlook_writeback_days"><option value="7">1 week ahead</option><option value="14">2 weeks ahead</option><option value="28">4 weeks ahead</option><option value="60">2 months ahead</option></select></label>
+      </div>
+      <p class="help" id="writebackHelp">Each task with a time gets its own event. Moving or resizing the event in Outlook moves the task in Todoist; deleting it removes the task's time. Turning this off removes the upcoming events Planner added.</p>
+      <p class="help" id="writebackNeeds" hidden>Needs "Outlook on this PC" above.</p>
+    </fieldset>
     <fieldset>
       <legend>View</legend>
       <div class="cols">

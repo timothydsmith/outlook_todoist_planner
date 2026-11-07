@@ -242,6 +242,15 @@ class FakeTasks:
             raise SourceError("Couldn't reach Todoist.")
         return [json.loads(json.dumps(t)) for t in self.items.values()]
 
+    def notices(self):
+        return []
+
+    def unknown_zones(self):
+        return set()
+
+    def reset(self):
+        pass
+
     def schedule(self, tid, date, at, minutes):
         self.calls.append((tid, date, at, minutes))
         t = self.items[tid]

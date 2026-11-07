@@ -10,6 +10,7 @@ What you can do in it:
 - Tick a task's circle to complete it (with Undo).
 - Double-click an empty slot to add a task at that time. It goes to your Todoist inbox.
 - Click a meeting to see its details and a **Join meeting** button when it has a Teams or Zoom link.
+- Optionally, put your timed tasks into your Outlook calendar as events, and move them from there (Windows, with "Outlook on this PC").
 
 Keyboard: ← and → move between weeks, **T** goes to today, **D** and **W** switch between day and week view, and **R** refreshes.
 
@@ -39,9 +40,23 @@ To try it with sample data first, run `py -m planner --demo`.
 
 When you close the window, the app stops on its own. For a desktop shortcut on Windows, right-click `Start Planner.bat` › Send to › Desktop.
 
+## Tasks in Outlook
+
+With "Outlook on this PC" selected, tick **Add timed tasks to my Outlook calendar** in Settings. Each Todoist task that has a time then gets its own event in your calendar, which you'll also see in the new Outlook and on your phone.
+
+- **Which tasks:** tasks with a time, from today up to the number of weeks ahead you choose. Tasks with only a date don't get an event. Repeating tasks get one for their next occurrence.
+- **Both directions:** moving a task in Planner or Todoist moves its event. Moving or resizing the event in Outlook moves the task in Todoist, and deleting the event removes the task's time (it keeps its date). If both were changed between syncs, Todoist wins and the yellow bar says so. Repeating tasks are always moved in Todoist; if you move one in Outlook, Planner puts it back.
+- **Completing a task** removes its upcoming event. An event whose time has already started stays, as a record.
+- **What's in an event:** the task name, its description and a link to it in Todoist. It shows you as Busy (Settings can change this to Tentative or Free) and has no reminder, because Todoist does reminders.
+- **When it happens:** a couple of seconds after each change in Planner, and at each refresh. Changes you make in Outlook or Todoist while Planner is closed are picked up next time it runs.
+- **Safety:** Planner tags its events and only ever changes or deletes those; your meetings are never touched. Deleted events go to Deleted Items. If Todoist can't be read or Outlook hasn't connected yet, nothing is changed, and if one sync would remove more than 10 events, it removes none and tells you why.
+- **Turning it off** removes the upcoming events Planner added (to Deleted Items). Switching away from "Outlook on this PC" does the same.
+
+Planner remembers which event belongs to which task in `outlook_sync.json`, next to its settings. If that file is lost, it finds its events again by their tags.
+
 ## For developers
 
-- `planner/` holds the Python code, one module per area: `todoist.py`, `ics.py` (calendar files), `outlook/` (classic Outlook through a long-running PowerShell helper, `helper.ps1`), `sources.py` (where events and tasks come from), `app.py`, `server.py` (the local web server), and `window.py`.
+- `planner/` holds the Python code, one module per area: `todoist.py`, `ics.py` (calendar files), `outlook/` (classic Outlook through a long-running PowerShell helper, `helper.ps1`, and the two-way task sync, `sync.py`), `sources.py` (where events and tasks come from), `app.py`, `server.py` (the local web server), and `window.py`.
 - `planner/ui/` holds the page itself: `index.html`, `app.js` and `styles.css`. The server reads them on each request, so a browser refresh picks up any edits.
 - Run the tests with `py -m unittest` (Mac: `python3 -m unittest`). They use only the standard library and need no accounts.
 
@@ -49,7 +64,7 @@ When you close the window, the app stops on its own. For a desktop shortcut on W
 
 - **Your data stays local.** The app talks only to Todoist and to Outlook's calendar link. Settings, including your Todoist token, are saved in `%APPDATA%\OutlookTodoistPlanner\settings.json` on Windows or `~/Library/Application Support/OutlookTodoistPlanner/settings.json` on a Mac.
 - **The published link is unauthenticated.** Anyone who has it can see what you published, so keep it to yourself, and check it sits within your organisation's IT policy. You can unpublish it at any time from the same Outlook settings page. If you'd rather publish nothing, the "Outlook on this PC" option avoids it.
-- **Outlook is read-only here.** Change meetings in Outlook. A published calendar can take a few minutes to reflect changes.
+- **Meetings are read-only here.** Change them in Outlook. A published calendar can take a few minutes to reflect changes. The only events Planner writes are its own task events (see Tasks in Outlook).
 - **Recurring tasks** show on their next date but can't be dragged, because that would break their repeat pattern. Change those in Todoist.
 - **Show work tasks only:** in Settings, add a Todoist filter such as `#Work` or `@work`.
 - **Time zones:** Outlook's published calendar includes its own time-zone details, so it needs nothing extra. If a meeting or task uses a time zone the app can't work out, the yellow bar names it and shows it in your own time zone. On Windows this usually means Python's time-zone data is missing: run `py -m pip install tzdata` once (it doesn't need admin rights), then restart the app.
@@ -66,6 +81,9 @@ The app shows a yellow bar at the top with a plain explanation and an **Open set
 | "Couldn't read the Outlook desktop app" | Classic Outlook needs to be installed (it doesn't need to be open). If the details mention a class not being registered, it isn't installed. |
 | "Classic Outlook took too long to answer" | Classic Outlook may be waiting on a dialog box, such as a sign-in prompt. Open classic Outlook once, deal with the prompt, close it, and refresh. |
 | "Outlook hasn't connected to the server yet" | Classic Outlook was still connecting when Planner read it, so the meetings shown come from its last saved copy. The next refresh tries again. |
+| "Planner would have removed N task events from Outlook in one go" | A lot of tasks disappeared at once, often because the Todoist filter changed. If you meant it, turn "Add timed tasks to my Outlook calendar" off (which removes them) and on again. |
+| "… was moved in both Outlook and Todoist" | Planner kept the Todoist time. Move it again wherever you like. |
+| "Couldn't update your Outlook calendar" | The details say what classic Outlook reported. Planner tries again at the next refresh. |
 | "Some items use time zones this computer's Python doesn't know" | Close the app, run `py -m pip install tzdata` (Mac: `python3 -m pip install tzdata`), and start it again. |
 | Certificate errors on a Mac | Run "Install Certificates.command" from your Python folder in Applications. |
 | `python` isn't recognised (Windows) | Install Python as described above, then try again. |

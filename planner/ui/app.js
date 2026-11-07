@@ -193,7 +193,7 @@ function renderStatus() {
 function renderBanner() {
   const el = $("#banner"), s = state.settings;
   const rows = [];
-  const names = { calendar: "Outlook", todoist: "Todoist", app: "Planner", timezones: "Time zones" };
+  const names = { calendar: "Outlook", outlook: "Outlook", todoist: "Todoist", app: "Planner", timezones: "Time zones" };
   for (const e of state.errors) rows.push(`<p><span class="src">${names[e.source] || "Problem"}</span><span>${esc(e.message)}</span>` +
     (e.source === "app" || e.source === "timezones" ? "" : ` <button data-act="settings">Open settings</button>`) + `</p>`);
   if (s && !state.demo) {
@@ -387,6 +387,7 @@ function showTask(t, anchor) {
     (t.description ? `<p class="desc">${esc(t.description)}</p>` : "") +
     `<div class="actions"><button class="btn primary" data-act="complete" data-id="${esc(t.id)}">Complete</button>${unset}` +
     `<a class="btn" href="${esc(t.url)}" target="_blank" rel="noopener">Open in Todoist</a></div>` +
+    (t.inOutlook ? `<p class="note">Also in your Outlook calendar.</p>` : "") +
     (t.due?.recurring ? `<p class="note">Recurring tasks are rescheduled in Todoist so their pattern stays intact.</p>` : ""), anchor);
 }
 
@@ -551,14 +552,24 @@ function openSettings(intro = false) {
   form.elements.default_task_minutes.value = String(s.default_task_minutes ?? 30);
   form.elements.refresh_minutes.value = String(s.refresh_minutes ?? 5);
   form.elements.show_weekends.checked = s.show_weekends !== false;
+  form.elements.outlook_writeback.checked = !!s.outlook_writeback;
+  form.elements.outlook_show_as.value = s.outlook_show_as || "busy";
+  const daysSel = form.elements.outlook_writeback_days, days = String(s.outlook_writeback_days ?? 14);
+  if (![...daysSel.options].some(o => o.value === days)) daysSel.add(new Option(`${days} days ahead`, days));
+  daysSel.value = days;
+  $("#writebackSet").hidden = $("#desktopOption").hidden;
   syncIcsField();
   dlg.showModal();
 }
 function syncIcsField() {
   const ics = form.elements.calendar_source.value === "ics";
   $("#icsField").hidden = !ics; $("#icsHelp").hidden = !ics;
+  const desktop = form.elements.calendar_source.value === "outlook_desktop", f = form.elements;
+  f.outlook_writeback.disabled = !desktop;
+  f.outlook_show_as.disabled = f.outlook_writeback_days.disabled = !desktop || !f.outlook_writeback.checked;
+  $("#writebackNeeds").hidden = desktop;
 }
-form.addEventListener("change", e => { if (e.target.name === "calendar_source") syncIcsField(); });
+form.addEventListener("change", e => { if (e.target.name === "calendar_source" || e.target.name === "outlook_writeback") syncIcsField(); });
 form.addEventListener("submit", async e => {
   if (e.submitter && e.submitter.value === "cancel") return;
   e.preventDefault();
@@ -572,7 +583,12 @@ form.addEventListener("submit", async e => {
     calendar_source: src, ics_url: url, week_start: Number(f.week_start.value), day_start_hour: Number(f.day_start_hour.value),
     default_task_minutes: Number(f.default_task_minutes.value), refresh_minutes: Number(f.refresh_minutes.value),
     show_weekends: f.show_weekends.checked,
+    outlook_writeback: f.outlook_writeback.checked && src === "outlook_desktop",
+    outlook_show_as: f.outlook_show_as.value, outlook_writeback_days: Number(f.outlook_writeback_days.value),
   };
+  const s = state.settings || {};
+  if (s.outlook_writeback && s.calendar_source === "outlook_desktop" && !body.outlook_writeback &&
+      !confirm("Turning this off removes the upcoming task events Planner added to your Outlook calendar (they go to Deleted Items). Continue?")) return;
   const btn = $("#saveSettings"); btn.disabled = true;
   try {
     state.settings = await api("/api/settings", body);
