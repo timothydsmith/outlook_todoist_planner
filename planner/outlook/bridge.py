@@ -33,6 +33,14 @@ class _HelperGone(Exception):
     """The helper exited or stopped answering. Worth one restart."""
 
 
+class HelperError(SourceError):
+    """The helper answered, but the request failed. `detail` is the helper's own message."""
+
+    def __init__(self, message: str, detail: str):
+        super().__init__(message)
+        self.detail = detail
+
+
 class OutlookBridge:
     def __init__(self, command: list | None = None, first_timeout: float = 60.0, timeout: float = 30.0):
         self.command = command            # None = the real PowerShell helper
@@ -158,6 +166,6 @@ class OutlookBridge:
                 break     # anything else answers an earlier request we gave up on
         self._answered = True
         if not resp.get("ok"):
-            raise SourceError(f"Couldn't read the Outlook desktop app. {NEEDS_CLASSIC} "
-                              f"Details: {str(resp.get('error') or 'no details')[:240]}")
+            detail = str(resp.get("error") or "no details")[:240]
+            raise HelperError(f"Couldn't read the Outlook desktop app. {NEEDS_CLASSIC} Details: {detail}", detail)
         return resp
