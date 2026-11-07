@@ -7,6 +7,7 @@ import sys
 import threading
 from pathlib import Path
 
+
 DEFAULTS = {
     "todoist_token": "",
     "todoist_filter": "",

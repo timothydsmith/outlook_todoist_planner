@@ -7,6 +7,7 @@ import re
 
 from .timeutil import to_local_naive, zone_by_name
 
+
 WEEKDAY_CODES = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
 
 # Fallback only: Outlook feeds normally carry their own VTIMEZONE definitions.

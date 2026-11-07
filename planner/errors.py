@@ -1,6 +1,4 @@
 """Errors worded for the person using the app."""
-from __future__ import annotations
-
 
 
 class SourceError(Exception):

@@ -10,6 +10,7 @@ try:
 except ImportError:  # pragma: no cover
     ZoneInfo = None
 
+
 _ISO_RE = re.compile(
     r"^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?\s*(Z|[+-]\d{2}:?\d{2})?$")
 

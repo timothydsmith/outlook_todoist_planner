@@ -12,6 +12,7 @@ from .config import Config, config_path
 from .server import PlannerServer
 from .window import _existing_instance, _watchdog, open_window
 
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Outlook calendar + Todoist tasks in one week view.")
     ap.add_argument("--demo", action="store_true", help="use sample data instead of your accounts")

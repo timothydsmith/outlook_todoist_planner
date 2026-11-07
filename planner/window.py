@@ -11,6 +11,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+
 def _app_browser_candidates() -> list:
     c = []
     if sys.platform == "win32":

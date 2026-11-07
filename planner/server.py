@@ -15,6 +15,7 @@ from . import APP_NAME, VERSION
 from .app import PlannerApp
 from .errors import SourceError
 
+
 UI_DIR = Path(__file__).with_name("ui")
 # The only files the page may load besides index.html. Nothing else on disk is reachable.
 UI_ASSETS = {"/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -131,9 +132,7 @@ class PlannerHandler(BaseHTTPRequestHandler):
                     return self._send(400, {"error": "Settings can't be changed in demo mode. "
                                                      "Start the app without --demo to use your own data."})
                 app.cfg.update(body)
-                app._invalidate_tasks()
-                app._ics["fetched"] = 0.0
-                app._outlook.clear()
+                app.settings_changed()
                 return self._send(200, app.cfg.public())
             if u.path == "/api/task/close":
                 app.close_task(str(body["id"]))

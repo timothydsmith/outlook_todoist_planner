@@ -7,6 +7,7 @@ import urllib.request
 
 from . import APP_NAME, VERSION
 
+
 def _ssl_context() -> ssl.SSLContext:
     ctx = ssl.create_default_context()
     try:  # python.org builds on macOS ship without CA certs; certifi fills the gap if present

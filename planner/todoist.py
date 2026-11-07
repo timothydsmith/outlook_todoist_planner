@@ -12,6 +12,7 @@ from .errors import SourceError, _reason
 from .net import http_request
 from .timeutil import parse_iso, to_local_naive, zone_by_name
 
+
 TODOIST_API = os.environ.get("PLANNER_TODOIST_API", "https://api.todoist.com/api/v1")
 TODOIST_TASK_URL = "https://app.todoist.com/app/task/{id}"
 

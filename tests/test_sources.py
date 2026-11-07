@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 from planner import app as planner_app
-from planner import config, errors, outlook_desktop, todoist
+from planner import config, errors, outlook_desktop, sources, todoist
 
 
 class FakeTodoist(ThreadingHTTPServer):
@@ -142,7 +142,7 @@ class PlannerAppTodoistTests(unittest.TestCase):
         self.fake.routes[("POST", "/api/v1/tasks/1")] = (200, {})
         # Point every client the app makes at the fake server.
         real = todoist.TodoistClient
-        patcher2 = mock.patch.object(planner_app, "TodoistClient", lambda token: real(token, base=self.fake.base))
+        patcher2 = mock.patch.object(sources, "TodoistClient", lambda token: real(token, base=self.fake.base))
         patcher2.start()
         self.addCleanup(patcher2.stop)
         cfg = config.Config(Path("unused.json"), memory_only=True)
@@ -231,7 +231,7 @@ class IcsDownloadTests(unittest.TestCase):
 
     def test_webcal_links_are_fetched_over_https(self):
         self.cfg.update({"ics_url": "webcal://outlook.office365.com/owa/calendar/x/calendar.ics"})
-        with mock.patch.object(planner_app, "http_request", return_value=(200, b"BEGIN:VCALENDAR\r\nEND:VCALENDAR")) as req:
+        with mock.patch.object(sources, "http_request", return_value=(200, b"BEGIN:VCALENDAR\r\nEND:VCALENDAR")) as req:
             self.app.events(dt.date(2026, 11, 10), dt.date(2026, 11, 11), force=False)
         self.assertEqual(req.call_args[0][1], "https://outlook.office365.com/owa/calendar/x/calendar.ics")
 
@@ -244,6 +244,58 @@ class IcsDownloadTests(unittest.TestCase):
             with self.assertRaises(errors.SourceError) as cm:
                 self.app.events(dt.date(2026, 11, 10), dt.date(2026, 11, 11), force=False)
             self.assertIn(words, str(cm.exception), url)
+
+
+class SourceSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.cfg = config.Config(Path("unused.json"), memory_only=True)
+        self.app = planner_app.PlannerApp(self.cfg)
+
+    def test_calendar_follows_the_setting(self):
+        for value, kind in (("ics", sources.IcsCalendar), ("outlook_desktop", sources.OutlookDesktopCalendar),
+                            ("none", sources.NoCalendar)):
+            self.cfg.update({"calendar_source": value})
+            self.assertIsInstance(self.app.calendar, kind, value)
+        self.assertIsInstance(self.app.task_source, sources.TodoistTasks)
+
+    def test_demo_ignores_the_setting(self):
+        app = planner_app.PlannerApp(self.cfg, demo=True)
+        self.cfg.update({"calendar_source": "none"})
+        self.assertIsInstance(app.calendar, sources.DemoCalendar)
+        self.assertIsInstance(app.task_source, sources.DemoTasks)
+
+    def test_changing_settings_forgets_cached_data(self):
+        downloads = []
+
+        def fake_get(*args, **kwargs):
+            downloads.append(args[1])
+            return 200, b"BEGIN:VCALENDAR\r\nEND:VCALENDAR"
+
+        day = dt.date(2026, 11, 10)
+        self.cfg.update({"calendar_source": "ics", "ics_url": "https://example.test/cal.ics"})
+        with mock.patch.object(sources, "http_request", side_effect=fake_get):
+            self.app.events(day, day + dt.timedelta(days=1), force=False)
+            self.app.events(day, day + dt.timedelta(days=1), force=False)
+            self.app.settings_changed()
+            self.app.events(day, day + dt.timedelta(days=1), force=False)
+        self.assertEqual(len(downloads), 2)
+
+    def test_source_notices_reach_the_page(self):
+        class Noisy(sources.CalendarSource):
+            def notices(self):
+                return [{"source": "calendar", "message": "Heads up"}]
+
+        self.app._calendars["none"] = Noisy()
+        self.cfg.update({"calendar_source": "none"})
+        out = self.app.data(dt.date(2026, 11, 9), dt.date(2026, 11, 16), force=False)
+        self.assertEqual(out["errors"], [{"source": "calendar", "message": "Heads up"}])
+
+    def test_close_reaches_every_calendar_source(self):
+        closed = []
+        for name, cal in self.app._calendars.items():
+            cal.close = lambda name=name: closed.append(name)
+        self.app.close()
+        self.assertEqual(sorted(closed), ["ics", "none", "outlook_desktop"])
 
 
 def fake_powershell(stdout: str, returncode=0, stderr=""):

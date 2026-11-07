@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+
 def demo_ics(today: dt.date) -> str:
     monday = today - dt.timedelta(days=today.weekday())
 

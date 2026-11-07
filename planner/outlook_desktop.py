@@ -9,6 +9,7 @@ import sys
 from .errors import SourceError
 from .ics import _MEETING_URL
 
+
 _PS_SCRIPT = (
     "$ErrorActionPreference='Stop';"
     "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;"
