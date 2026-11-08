@@ -60,6 +60,27 @@ Planner remembers which event belongs to which task in `outlook_sync.json`, next
 - `planner/ui/` holds the page itself: `index.html`, `app.js` and `styles.css`. The server reads them on each request, so a browser refresh picks up any edits.
 - Run the tests with `py -m unittest` (Mac: `python3 -m unittest`). They use only the standard library and need no accounts.
 
+### Versions and branches
+
+Planner uses [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`. The version lives in `planner/__init__.py` (`VERSION`), shows at the bottom of Settings, and each release is listed in [CHANGELOG.md](CHANGELOG.md).
+
+- **PATCH** (1.1.0 → 1.1.1): bug fixes only.
+- **MINOR** (1.1.0 → 1.2.0): new features that keep existing settings and behaviour working.
+- **MAJOR** (1.1.0 → 2.0.0): changes that break something you rely on, such as settings that have to be entered again or a removed feature.
+
+Branches:
+
+- **`main`** holds released versions only. Each release is tagged `vX.Y.Z`.
+- **`dev`** is where work happens. Commit there, and note each change under "Unreleased" in the changelog.
+
+To release from `dev`:
+
+1. Choose the new version number. Move the "Unreleased" notes under a new heading for it in `CHANGELOG.md`, and set `VERSION` to match. A test checks that the two agree.
+2. Commit, then run the tests.
+3. Merge into `main` with `git switch main`, then `git merge --no-ff dev`.
+4. Tag the merge with `git tag -a vX.Y.Z -m "Planner X.Y.Z"`.
+5. Push with `git push origin main dev --follow-tags`, then `git switch dev`.
+
 ## Good to know
 
 - **Your data stays local.** The app talks only to Todoist and to Outlook's calendar link. Settings, including your Todoist token, are saved in `%APPDATA%\OutlookTodoistPlanner\settings.json` on Windows or `~/Library/Application Support/OutlookTodoistPlanner/settings.json` on a Mac.

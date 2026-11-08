@@ -19,5 +19,5 @@ Your Todoist token is stored there in plain text, readable only by your account.
 """
 
 APP_NAME = "Planner"
-VERSION = "1.0"
+VERSION = "1.1.0"  # semantic versioning: MAJOR.MINOR.PATCH; see CHANGELOG.md
 DEFAULT_PORT = 8765

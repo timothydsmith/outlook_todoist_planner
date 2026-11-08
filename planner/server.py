@@ -89,6 +89,7 @@ class PlannerHandler(BaseHTTPRequestHandler):
         if u.path == "/api/settings":
             s = app.cfg.public()
             s["demo"] = app.demo
+            s["version"] = VERSION
             return self._send(200, s)
         if u.path == "/api/data":
             try:

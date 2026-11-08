@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from planner import app as planner_app
-from planner import config, server
+from planner import VERSION, config, server
 
 TOKEN = "test-token-abc"
 
@@ -87,6 +87,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(s["demo"])
         self.assertNotIn("todoist_token", s)
+        self.assertEqual(s["version"], VERSION)
 
     def test_settings_cannot_change_in_demo(self):
         status, body = self.call("POST", "/api/settings", body={"ics_url": "https://x"})

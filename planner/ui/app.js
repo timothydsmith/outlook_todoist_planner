@@ -541,6 +541,7 @@ function openSettings(intro = false) {
   if (state.demo) { toast("Settings are off in demo mode. Start the app without --demo to connect your accounts."); return; }
   $("#settingsIntro").hidden = !intro;
   $("#settingsError").hidden = true;
+  $("#appVersion").textContent = s.version ? `Planner ${s.version}` : "";
   form.elements.todoist_token.value = "";
   form.elements.todoist_token.placeholder = s.has_token ? `Saved (ends ${s.token_hint.replace("…", "")}). Paste a new one to replace it.` : "Paste your token";
   form.elements.todoist_filter.value = s.todoist_filter || "";

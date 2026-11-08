@@ -192,7 +192,8 @@ label.f>span{display:block;font-weight:600;margin-bottom:4px}
 .radio small{display:block;color:var(--ink-2)}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .check-row{display:flex;gap:8px;align-items:center;margin:4px 0 10px}
-.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.dialog-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:6px}
+.app-version{margin-right:auto;color:var(--ink-3);font-size:12px}
 .dialog-actions .primary{background:var(--ink);color:#fff;border-color:var(--ink)}
 .form-error{color:#9B2C24;margin:0 0 10px}
 
