@@ -12,7 +12,7 @@ Each line of LOGFILE records "start" or a request's op. MODE:
   noise         prints stray output and a stale reply before each real reply
   disconnected also answers tagged with connected=false
 
-Planner's own events (tagged/get/put/remove/flush) live in LOGFILE + ".cal.json", so tests can
+Planner's own events (tagged/put/remove/flush) live in LOGFILE + ".cal.json", so tests can
 read it, and edit it to play the part of someone changing the event in Outlook:
   {"next": 1, "items": {entryId: {taskId, subject, body, start, end, allDay, busy, deleted}}}
 An item with no taskId is an ordinary (untagged) event.
@@ -48,23 +48,10 @@ def calendar_op(req):
     op = req["op"]
     cal = load_cal()
     items = cal["items"]
-    if op == "tagged":
-        s, e = req["start"], req["end"]
-        found = [row(k, v) for k, v in items.items()
-                 if v.get("taskId") and not v.get("deleted") and v["start"] < e and v["end"] > s]
+    if op == "tagged":   # like the real helper: every tagged event still in the calendar
+        found = [row(k, v) for k, v in items.items() if v.get("taskId") and not v.get("deleted")]
         return {"ok": True, "connected": mode != "disconnected", "connection": 400 if mode == "disconnected" else 700,
                 "items": found}
-    if op == "get":
-        out = []
-        for eid in req["ids"]:
-            it = items.get(eid)
-            if it is None:
-                out.append({"entryId": eid, "missing": True})
-            elif not it.get("taskId"):
-                out.append({"entryId": eid, "tagged": False})
-            else:
-                out.append(row(eid, it))
-        return {"ok": True, "items": out}
     if op == "put":
         if req["end"] <= req["start"]:
             return {"ok": False, "error": "The end time must be after the start time."}
@@ -136,7 +123,7 @@ for line in sys.stdin:
                "end": req["start"] + "T11:00:00", "allDay": False, "location": "", "busy": 2}
         send({"id": rid, "ok": True, "connected": mode != "disconnected",
               "connection": 400 if mode == "disconnected" else 700, "rows": [row]})
-    elif op in ("tagged", "get", "put", "remove", "flush"):
+    elif op in ("tagged", "put", "remove", "flush"):
         if mode == "error":
             send({"id": rid, "ok": False, "error": "Class not registered (0x80040154)"})
             continue

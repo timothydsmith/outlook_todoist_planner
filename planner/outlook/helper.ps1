@@ -8,13 +8,16 @@
 # Failures come back as {"id": n, "ok": false, "error": "..."}; the helper keeps running.
 #
 # Events Planner makes carry the user property PlannerTaskId. These requests only ever touch such events:
-#   tagged {start, end}       -> {connected, connection, items: [item...]}   tagged events overlapping the range
-#   get {ids: [entryId...]}   -> {items: [item...]}   one per id; {entryId, missing: true} if it no longer exists,
-#                                                     {entryId, tagged: false} if it isn't one of Planner's
+#   tagged                    -> {connected, connection, items: [item...]}   every tagged event in the calendar
 #   put {entryId?, taskId, subject, body, start, end, busy}  -> {entryId, start, end}   create, or update in place
 #   remove {entryId}          -> {}                   moves it to Deleted Items (nothing if already gone)
 #   flush                     -> {}                   send/receive, so changes reach the server promptly
-# item = {entryId, taskId, subject, start, end, allDay, busy, deleted}; deleted = it's in Deleted Items.
+# item = {entryId, taskId, subject, start, end, allDay, busy}.
+#
+# `tagged` reads the calendar folder's table, not the items themselves: a long-running Outlook session can
+# hand back an out-of-date cached copy of an item opened by id (even one that has since been deleted),
+# whereas the table always reflects what's in the folder now. An event missing from it has been deleted
+# or moved out of the calendar.
 #
 # Classic Outlook started through COM runs without a window. If this helper started it, the helper closes it
 # again on quit (or when the app's end of stdin closes), unless you've since opened an Outlook window yourself.
@@ -31,6 +34,12 @@ $script:ol = $null
 $script:ns = $null
 $script:startedOutlook = $false
 $TagName = 'PlannerTaskId'
+# The same user property, addressed by its MAPI name, for table queries (PS_PUBLIC_STRINGS namespace).
+$TagDasl = 'http://schemas.microsoft.com/mapi/string/{00020329-0000-0000-C000-000000000046}/' + $TagName
+$AllDayDasl = 'http://schemas.microsoft.com/mapi/id/{00062002-0000-0000-C000-000000000046}/8215000B'
+$BusyDasl = 'http://schemas.microsoft.com/mapi/id/{00062002-0000-0000-C000-000000000046}/82050003'
+# A table's EntryID column can be a short-term id; this is the item's permanent EntryID (PR_LONGTERM_ENTRYID_FROM_TABLE).
+$LongIdDasl = 'http://schemas.microsoft.com/mapi/proptag/0x66700102'
 $Invariant = [Globalization.CultureInfo]::InvariantCulture
 
 function Release($obj) {
@@ -128,22 +137,6 @@ function Get-Tag($item) {
     finally { Release $p; Release $props }
 }
 
-function Test-InDeletedItems($item) {
-    $parent = $null; $bin = $null
-    try {
-        $parent = $item.Parent
-        $bin = $script:ns.GetDefaultFolder(3)          # olFolderDeletedItems
-        return ([string]$parent.EntryID -eq [string]$bin.EntryID)
-    } catch { return $false }
-    finally { Release $parent; Release $bin }
-}
-
-function ConvertTo-ItemRow($a, [string]$tag) {
-    return @{ entryId = [string]$a.EntryID; taskId = $tag; subject = [string]$a.Subject
-              start = $a.Start.ToString('s'); end = $a.End.ToString('s'); allDay = [bool]$a.AllDayEvent
-              busy = [int]$a.BusyStatus; deleted = (Test-InDeletedItems $a) }
-}
-
 # MAPI_E_NOT_FOUND: the item has been permanently deleted (or never existed). Anything else is a real error.
 function Test-NotFound($err) {
     $ex = $err.Exception
@@ -159,48 +152,37 @@ function Find-PlannerItem([string]$entryId) {
     catch { if (Test-NotFound $_) { return $null } else { throw } }
 }
 
-function Get-Tagged([string]$startText, [string]$endText) {
-    $s = [datetime]::ParseExact($startText, 'yyyy-MM-dd', $Invariant)
-    $e = [datetime]::ParseExact($endText, 'yyyy-MM-dd', $Invariant)
+function Get-Tagged {
     $mode = Wait-Connected
     $cal = $script:ns.GetDefaultFolder(9)
-    $items = $cal.Items
-    $items.Sort('[Start]')
-    $filter = "[Start] < '" + $e.ToString('g') + "' AND [End] > '" + $s.ToString('g') + "'"
-    try { $res = $items.Restrict($filter) } catch { $res = $items }
+    $table = $null; $cols = $null
     $out = New-Object System.Collections.ArrayList
-    $seen = 0
     try {
-        foreach ($a in $res) {
+        $table = $cal.GetTable("@SQL=""$TagDasl"" IS NOT NULL")
+        $cols = $table.Columns
+        $cols.RemoveAll()
+        foreach ($c in @($LongIdDasl, 'Subject', 'Start', 'End', $AllDayDasl, $BusyDasl, $TagDasl, 'EntryID')) { [void]$cols.Add($c) }
+        while (-not $table.EndOfTable) {
+            $r = $table.GetNextRow()
             try {
-                if ($a.Start -ge $e) { break }
-                if ($a.End -le $s) { continue }
-                $tag = Get-Tag $a
-                if ($tag) { [void]$out.Add((ConvertTo-ItemRow $a $tag)) }
-            } finally { Release $a }
-            $seen++
-            if ($seen -ge $MaxRows) { break }
+                $tag = [string]$r.Item($TagDasl)
+                if ($tag) {
+                    $eid = ''
+                    try { $eid = [string]$r.BinaryToString(1) } catch { }   # column 1 = the permanent id
+                    if (-not $eid) { $eid = [string]$r.Item('EntryID') }
+                    [void]$out.Add(@{ entryId = $eid; taskId = $tag; subject = [string]$r.Item('Subject')
+                                      start = ([datetime]$r.Item('Start')).ToString('s'); end = ([datetime]$r.Item('End')).ToString('s')
+                                      allDay = [bool]$r.Item($AllDayDasl); busy = [int]$r.Item($BusyDasl) })
+                }
+            } finally { Release $r }
+            if ($out.Count -ge $MaxRows) { break }
         }
     } finally {
-        if (-not [object]::ReferenceEquals($res, $items)) { Release $res }
-        Release $items
+        Release $cols
+        Release $table
         Release $cal
     }
     return @{ ok = $true; connected = (Test-Connected $mode); connection = $mode; items = @($out) }
-}
-
-function Get-PlannerItems($ids) {
-    $out = New-Object System.Collections.ArrayList
-    foreach ($id in @($ids)) {
-        $a = Find-PlannerItem ([string]$id)
-        if ($null -eq $a) { [void]$out.Add(@{ entryId = [string]$id; missing = $true }); continue }
-        try {
-            $tag = Get-Tag $a
-            if ($tag) { [void]$out.Add((ConvertTo-ItemRow $a $tag)) }
-            else { [void]$out.Add(@{ entryId = [string]$id; tagged = $false }) }
-        } finally { Release $a }
-    }
-    return @{ ok = $true; items = @($out) }
 }
 
 function Set-PlannerItem($req) {
@@ -239,7 +221,7 @@ function Remove-PlannerItem([string]$entryId) {
     if ($null -eq $a) { return @{ ok = $true } }
     try {
         if (-not (Get-Tag $a)) { throw "That Outlook event wasn't made by Planner." }
-        if (-not (Test-InDeletedItems $a)) { $a.Delete() }
+        try { $a.Delete() } catch { if (-not (Test-NotFound $_)) { throw } }   # already gone is fine
     } finally { Release $a }
     return @{ ok = $true }
 }
@@ -270,11 +252,15 @@ try {
                     Connect-Outlook
                     $resp = Get-Events ([string]$req.start) ([string]$req.end)
                 }
-                'tagged' { Connect-Outlook; $resp = Get-Tagged ([string]$req.start) ([string]$req.end) }
-                'get'    { Connect-Outlook; $resp = Get-PlannerItems $req.ids }
+                'tagged' { Connect-Outlook; $resp = Get-Tagged }
                 'put'    { Connect-Outlook; $resp = Set-PlannerItem $req }
                 'remove' { Connect-Outlook; $resp = Remove-PlannerItem ([string]$req.entryId) }
-                'flush'  { Connect-Outlook; $script:ns.SendAndReceive($false); $resp = @{ ok = $true } }
+                'flush'  {
+                    Connect-Outlook
+                    $mode = Wait-Connected                     # send/receive fails until Outlook has logged on
+                    if (Test-Connected $mode) { $script:ns.SendAndReceive($false) }
+                    $resp = @{ ok = $true; connected = (Test-Connected $mode) }
+                }
                 'quit' {
                     Disconnect-Outlook $true
                     $resp = @{ ok = $true }
@@ -292,6 +278,10 @@ try {
         }
         $resp.id = $id
         Send $resp
+        # Let go of every item object this request touched, so Outlook doesn't keep (and later hand back)
+        # stale cached copies of them.
+        [GC]::Collect()
+        [GC]::WaitForPendingFinalizers()
     }
 } finally {
     Disconnect-Outlook $true

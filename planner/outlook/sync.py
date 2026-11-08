@@ -36,8 +36,6 @@ from .bridge import HelperError
 
 BUSY = {"free": 0, "tentative": 1, "busy": 2}
 MAX_DELETES = 10          # more than this in one sync looks like a mistake, so none are made
-SCAN_BACK_DAYS = 1        # how far back to look for tagged events Planner has lost track of
-CLEANUP_DAYS = 400        # how far ahead "remove all upcoming" looks
 NOT_CONNECTED = "Outlook hasn't connected to the server yet, so Planner will add tasks to it once it has."
 
 _FMT = "%Y-%m-%dT%H:%M:%S"
@@ -96,8 +94,9 @@ def reconcile(tasks: list, state: dict, current: dict, tagged: list, now: dt.dat
 
     tasks    every open task the app shows (normalized), so a task missing here is done or gone
     state    task id -> {"entryId", "start", "end", "sig"} from the last finished sync
-    current  entry id -> what Outlook says now about each event in state (the helper's `get`)
-    tagged   tagged events found between yesterday and window_end (the helper's `tagged`)
+    current  entry id -> what Outlook says now about each event in state: an item from the calendar, or
+             {"missing": True} if it's no longer there (deleted, or moved out of the calendar)
+    tagged   every tagged event in the calendar (the helper's `tagged`), to re-adopt ones not in state
     """
     plan = SyncPlan()
     want = {}
@@ -284,17 +283,20 @@ class OutlookSync:
         if not force and sig == self._last_sig and time.monotonic() - self._last_check < ttl:
             return                # nothing changed here, and Outlook was checked recently
         window_end = dt.datetime.combine(today + dt.timedelta(days=days), dt.time())
-        scan = self.bridge.request("tagged", start=(today - dt.timedelta(days=SCAN_BACK_DAYS)).isoformat(),
-                                   end=window_end.date().isoformat())
+        try:
+            self.bridge.request("flush")       # fetch edits made elsewhere (new Outlook, phone) before reading
+        except SourceError:
+            pass
+        scan = self.bridge.request("tagged")   # every tagged event in the calendar, read fresh
         if not scan.get("connected", True):
             self._notices = [NOT_CONNECTED]
             self._last_sig = None
             return
-        current = {}
-        ids = [rec["entryId"] for rec in state.values()]
-        if ids:
-            current = {it.get("entryId"): it for it in self.bridge.request("get", ids=ids).get("items") or []}
-        plan = reconcile(tasks, state, current, scan.get("items") or [], now, window_end, show_as, minutes)
+        items = scan.get("items") or []
+        in_calendar = {it.get("entryId"): it for it in items}
+        current = {rec["entryId"]: in_calendar.get(rec["entryId"]) or {"entryId": rec["entryId"], "missing": True}
+                   for rec in state.values()}
+        plan = reconcile(tasks, state, current, items, now, window_end, show_as, minutes)
 
         for tid, date, at, mins in plan.todoist:
             self.task_source.schedule(tid, date, at, mins)
@@ -323,17 +325,9 @@ class OutlookSync:
         """Delete every upcoming event Planner made (to Deleted Items) and forget them all. Returns how many."""
         with self._lock:
             now = self.clock()
-            today = now.date()
-            state = self.load_state()
-            scan = self.bridge.request("tagged", start=today.isoformat(),
-                                       end=(today + dt.timedelta(days=CLEANUP_DAYS)).isoformat())
+            scan = self.bridge.request("tagged")
             doomed = {it["entryId"] for it in scan.get("items") or []
                       if it.get("taskId") and not it.get("deleted") and _parse(it["start"]) > now}
-            ids = [rec["entryId"] for rec in state.values() if rec["entryId"] not in doomed]
-            if ids:
-                for it in self.bridge.request("get", ids=ids).get("items") or []:
-                    if it.get("taskId") and not it.get("deleted") and _parse(it["start"]) > now:
-                        doomed.add(it["entryId"])
             for eid in sorted(doomed):
                 self.bridge.request("remove", entryId=eid)
             if doomed:

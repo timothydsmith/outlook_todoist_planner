@@ -323,6 +323,17 @@ class OutlookSyncTests(unittest.TestCase):
         self.assertTrue(self.cal()[eid]["deleted"])
         self.assertEqual(sync.tracked, set())
 
+    def test_deleted_in_outlook_removes_the_time_in_todoist(self):
+        sync = self.make([task("a", "2026-11-11", "10:00", 30)])
+        sync.run_now()
+        [eid] = self.cal()
+        self.edit_cal(eid, deleted=True)              # gone from the calendar
+        sync.run_now(force=True)
+        self.assertEqual(self.tasks.calls, [("a", "2026-11-11", None, None)])
+        self.assertEqual(sync.tracked, set())
+        sync.run_now(force=True)                      # and it isn't made again
+        self.assertEqual(len(self.cal()), 1)
+
     def test_skips_when_nothing_changed(self):
         sync = self.make([task("a", "2026-11-11", "10:00", 30)])
         sync.run_now()
