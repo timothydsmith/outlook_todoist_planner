@@ -567,6 +567,7 @@ function openSettings(intro = false) {
   form.elements.show_weekends.checked = s.show_weekends !== false;
   form.elements.outlook_writeback.checked = !!s.outlook_writeback;
   form.elements.outlook_show_as.value = s.outlook_show_as || "busy";
+  form.elements.theme.value = s.theme || "system";
   const daysSel = form.elements.outlook_writeback_days, days = String(s.outlook_writeback_days ?? 14);
   if (![...daysSel.options].some(o => o.value === days)) daysSel.add(new Option(`${days} days ahead`, days));
   daysSel.value = days;
@@ -582,7 +583,13 @@ function syncIcsField() {
   f.outlook_show_as.disabled = f.outlook_writeback_days.disabled = !desktop || !f.outlook_writeback.checked;
   $("#writebackNeeds").hidden = desktop;
 }
-form.addEventListener("change", e => { if (e.target.name === "calendar_source" || e.target.name === "outlook_writeback") syncIcsField(); });
+form.addEventListener("change", e => {
+  if (e.target.name === "calendar_source" || e.target.name === "outlook_writeback") syncIcsField();
+  if (e.target.name === "theme") applyTheme(e.target.value);  // preview it while Settings is open
+});
+// The page arrives with the saved theme already set (the server fills it in); Cancel puts it back.
+function applyTheme(theme) { document.documentElement.dataset.theme = ["light", "dark"].includes(theme) ? theme : "system"; }
+dlg.addEventListener("close", () => applyTheme(state.settings?.theme));
 form.addEventListener("submit", async e => {
   if (e.submitter && e.submitter.value === "cancel") return;
   e.preventDefault();
@@ -598,6 +605,7 @@ form.addEventListener("submit", async e => {
     show_weekends: f.show_weekends.checked,
     outlook_writeback: f.outlook_writeback.checked && src === "outlook_desktop",
     outlook_show_as: f.outlook_show_as.value, outlook_writeback_days: Number(f.outlook_writeback_days.value),
+    theme: f.theme.value,
   };
   const s = state.settings || {};
   if (s.outlook_writeback && s.calendar_source === "outlook_desktop" && !body.outlook_writeback &&

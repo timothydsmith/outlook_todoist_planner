@@ -21,7 +21,10 @@ DEFAULTS = {
     "outlook_writeback": False,        # add timed tasks to Outlook as events (needs "outlook_desktop")
     "outlook_show_as": "busy",         # "busy" | "tentative" | "free"
     "outlook_writeback_days": 14,      # how far ahead new task events are made
+    "theme": "system",                 # "system" (follow the computer) | "light" | "dark"
 }
+
+THEMES = ("system", "light", "dark")
 
 
 def config_path() -> Path:
@@ -89,6 +92,8 @@ class Config:
                 v = bool(v)
             elif k == "outlook_show_as":
                 v = v if v in ("busy", "tentative", "free") else "busy"
+            elif k == "theme":
+                v = v if v in THEMES else "system"
             elif k == "outlook_writeback_days":
                 v = min(60, max(1, int(v)))
             elif k == "week_start":

@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="__PLANNER_THEME__">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
 <meta name="planner-token" content="__PLANNER_TOKEN__">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Planner</title>
@@ -94,6 +95,8 @@
           <select name="default_task_minutes"><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">1.5 hours</option></select></label>
         <label class="f"><span>Refresh every</span>
           <select name="refresh_minutes"><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></label>
+        <label class="f"><span>Appearance</span>
+          <select name="theme"><option value="system">Match my computer</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
       </div>
       <label class="check-row"><input type="checkbox" name="show_weekends"> Show weekends</label>
     </fieldset>

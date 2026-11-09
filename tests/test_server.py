@@ -57,6 +57,16 @@ class ServerTests(unittest.TestCase):
         self.assertIn(f'<meta name="planner-token" content="{TOKEN}">', html)
         self.assertNotIn("__PLANNER_TOKEN__", html)
 
+    def test_page_arrives_with_the_saved_theme(self):
+        self.assertIn('<html lang="en" data-theme="system">', self.call("GET", "/", token=None)[1])
+        for theme in ("dark", "light"):
+            self.server.app.cfg.update({"theme": theme})
+            self.assertIn(f'data-theme="{theme}"', self.call("GET", "/", token=None)[1])
+        self.server.app.cfg.data["theme"] = '"><script>'  # a hand-edited settings file can't inject markup
+        html = self.call("GET", "/", token=None)[1]
+        self.assertIn('data-theme="system"', html)
+        self.assertNotIn("<script>", html.split("</head>")[0])
+
     def test_page_files(self):
         status, js = self.call("GET", "/app.js", token=None)
         self.assertEqual(status, 200)

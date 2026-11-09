@@ -13,6 +13,7 @@ from pathlib import Path
 
 from . import APP_NAME, VERSION
 from .app import PlannerApp
+from .config import THEMES
 from .errors import SourceError
 
 
@@ -78,7 +79,9 @@ class PlannerHandler(BaseHTTPRequestHandler):
             return self._send(200, {"app": "planner", "version": VERSION})
         if u.path in ("/", "/index.html"):
             self._alive()
-            html = (UI_DIR / "index.html").read_text(encoding="utf-8").replace("__PLANNER_TOKEN__", self.server.token)
+            theme = self.server.app.cfg.get("theme")  # set on the page itself, so it never flashes light first
+            html = ((UI_DIR / "index.html").read_text(encoding="utf-8").replace("__PLANNER_TOKEN__", self.server.token)
+                    .replace("__PLANNER_THEME__", theme if theme in THEMES else "system"))
             return self._send(200, body=html.encode("utf-8"), ctype="text/html; charset=utf-8")
         if u.path in UI_ASSETS:
             name, ctype = UI_ASSETS[u.path]

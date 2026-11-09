@@ -12,6 +12,8 @@ What you can do in it:
 - Click a meeting to see its details and a **Join meeting** button when it has a Teams or Zoom link.
 - Optionally, put your timed tasks into your Outlook calendar as events, and move them from there (Windows, with "Outlook on this PC").
 
+Planner follows your computer's light or dark mode. To keep it one way, change **Appearance** in Settings.
+
 Keyboard: ← and → move between weeks, **T** goes to today, **D** and **W** switch between day and week view, and **R** refreshes.
 
 ## What you need
