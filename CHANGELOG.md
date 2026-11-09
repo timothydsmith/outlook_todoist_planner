@@ -4,6 +4,8 @@ All notable changes to Planner are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-10
+
 ### Added
 - Dark mode. By default Planner follows your computer's light or dark setting. Settings › Appearance can set it to always light or always dark.
 - Meetings show their Outlook category colour, as they do in Outlook. Tentative and free meetings show a lighter shade with a coloured edge. A meeting's categories are listed in its details. Colours need "Outlook on this PC", because published calendar links don't include them.
@@ -32,6 +34,7 @@ All notable changes to Planner are listed here. The format follows [Keep a Chang
 - Outlook is read from a published ICS link or from classic Outlook on this PC.
 - A test suite that uses only the standard library.
 
-[Unreleased]: https://github.com/timothydsmith/outlook_todoist_planner/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/timothydsmith/outlook_todoist_planner/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/timothydsmith/outlook_todoist_planner/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/timothydsmith/outlook_todoist_planner/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/timothydsmith/outlook_todoist_planner/releases/tag/v1.0.0
