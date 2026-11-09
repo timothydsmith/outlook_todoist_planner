@@ -4,7 +4,7 @@ A small app that shows your Outlook meetings and your scheduled Todoist tasks in
 
 What you can do in it:
 
-- See meetings (solid blocks) and Todoist tasks (outlined blocks, with a colour edge for priority) side by side.
+- See meetings (solid blocks, in their Outlook category colours) and Todoist tasks (outlined blocks, with a colour edge for priority) side by side. Category colours need "Outlook on this PC"; a published calendar link doesn't include them.
 - Drag a task onto the calendar to give it a time, or onto the all-day row to give it a date. Drag the bottom edge of a task to change its length.
 - Drag overdue or undated tasks from the left-hand list onto the calendar.
 - Tick a task's circle to complete it (with Undo).

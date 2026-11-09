@@ -5,6 +5,7 @@ import calendar as _calendar
 import datetime as dt
 import re
 
+from .categories import split_categories
 from .timeutil import to_local_naive, zone_by_name
 
 
@@ -608,6 +609,10 @@ class ICalendar:
         if busy is None:
             busy = "free" if text("TRANSP").upper() == "TRANSPARENT" else ("tentative" if status == "TENTATIVE" else "busy")
         location = text("LOCATION")
+        categories = []
+        for _p, v in c.every("CATEGORIES"):  # a comma-separated list; "\," is a comma inside a name
+            categories += [unescape_text(x).strip() for x in re.split(r"(?<!\\),", v)]
+        categories = split_categories(categories)
         url = ""
         for key in ("X-MICROSOFT-SKYPETEAMSMEETINGURL", "X-MICROSOFT-ONLINEMEETINGEXTERNALLINK",
                     "X-GOOGLE-CONFERENCE", "URL"):
@@ -649,7 +654,7 @@ class ICalendar:
         uid = text("UID") or f"nouid-{id(c)}"
         return {"uid": uid, "start": start, "duration": duration, "all_day": all_day, "title": summary,
                 "location": location, "busy": busy, "cancelled": cancelled, "status": status, "url": url,
-                "rule": rule, "exdates": exdates, "rdates": rdates, "rid": rid}
+                "categories": categories, "rule": rule, "exdates": exdates, "rdates": rdates, "rid": rid}
 
     # -- expansion ------------------------------------------------------------
     def _occurrences(self, ev: dict, ws: dt.datetime, we: dt.datetime) -> list:
@@ -728,7 +733,8 @@ class ICalendar:
                 return None
             return {"id": f"{ev['uid']}|{key or s.isoformat()}", "title": ev["title"], "allDay": True,
                     "start": s.isoformat(), "end": e.isoformat(), "location": ev["location"],
-                    "busy": ev["busy"], "cancelled": ev["cancelled"], "url": ev["url"]}
+                    "busy": ev["busy"], "cancelled": ev["cancelled"], "url": ev["url"],
+                    "categories": list(ev["categories"]), "color": None}
         s = occ_start
         if s.tzinfo is not None:
             e = (s.replace(tzinfo=None) + ev["duration"]).replace(tzinfo=s.tzinfo)
@@ -740,4 +746,5 @@ class ICalendar:
             return None
         return {"id": f"{ev['uid']}|{key or _instance_key(s, False)}", "title": ev["title"], "allDay": False,
                 "start": s_loc.strftime("%Y-%m-%dT%H:%M"), "end": e_loc.strftime("%Y-%m-%dT%H:%M"),
-                "location": ev["location"], "busy": ev["busy"], "cancelled": ev["cancelled"], "url": ev["url"]}
+                "location": ev["location"], "busy": ev["busy"], "cancelled": ev["cancelled"], "url": ev["url"],
+                "categories": list(ev["categories"]), "color": None}  # published feeds don't carry colours

@@ -16,7 +16,8 @@ import time
 import urllib.error
 
 from .config import Config
-from .demo import DEMO_PROJECTS, demo_ics, demo_tasks
+from .categories import category_color
+from .demo import DEMO_CATEGORY_COLORS, DEMO_PROJECTS, demo_ics, demo_tasks
 from .errors import SourceError, _reason
 from .ics import ICalendar
 from .net import http_request
@@ -60,7 +61,10 @@ class DemoCalendar(CalendarSource):
         self.cal = ICalendar(demo_ics(today))
 
     def events(self, start, end, force):
-        return self.cal.events_between(start, end)
+        evs = self.cal.events_between(start, end)
+        for ev in evs:
+            ev["color"] = category_color(ev["categories"], DEMO_CATEGORY_COLORS)
+        return evs
 
 
 class IcsCalendar(CalendarSource):
@@ -133,7 +137,8 @@ class OutlookDesktopCalendar(CalendarSource):
             self._connected = True
             return hit[1]
         resp = self.bridge.request("events", start=start.isoformat(), end=end.isoformat())
-        evs = rows_to_events(resp.get("rows") or [])
+        colors = resp.get("categoryColors")
+        evs = rows_to_events(resp.get("rows") or [], colors if isinstance(colors, dict) else None)
         self._connected = bool(resp.get("connected", True))
         if self._connected:
             if len(self._cache) > 20:

@@ -111,6 +111,7 @@ function Get-Events([string]$startText, [string]$endText) {
                     location = [string]$a.Location
                     busy     = [int]$a.BusyStatus
                     taskId   = (Get-Tag $a)
+                    categories = [string]$a.Categories
                 })
             } finally { Release $a }
             if ($rows.Count -ge $MaxRows) { break }
@@ -120,7 +121,22 @@ function Get-Events([string]$startText, [string]$endText) {
         Release $items
         Release $cal
     }
-    return @{ ok = $true; connected = (Test-Connected $mode); connection = $mode; rows = @($rows) }
+    return @{ ok = $true; connected = (Test-Connected $mode); connection = $mode; rows = @($rows)
+              categoryColors = (Get-CategoryColors) }
+}
+
+# The master category list: name -> OlCategoryColor (0 none, 1 red ... 25 dark maroon).
+function Get-CategoryColors {
+    $map = @{}
+    $cats = $null
+    try {
+        $cats = $script:ns.Categories
+        foreach ($c in $cats) {
+            try { $map[[string]$c.Name] = [int]$c.Color } finally { Release $c }
+        }
+    } catch {
+    } finally { Release $cats }
+    return $map
 }
 
 # ---- Planner's own events (tagged with PlannerTaskId) ----------------------------------------------

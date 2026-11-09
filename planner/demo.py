@@ -4,6 +4,10 @@ from __future__ import annotations
 import datetime as dt
 
 
+# Colours for the demo's categories, as Outlook's preset numbers (see planner/categories.py).
+DEMO_CATEGORY_COLORS = {"Team": 8, "Leadership": 16, "Projects": 6, "Personal": 24, "Travel": 2}
+
+
 def demo_ics(today: dt.date) -> str:
     monday = today - dt.timedelta(days=today.weekday())
 
@@ -21,28 +25,32 @@ def demo_ics(today: dt.date) -> str:
 
     add(["UID:demo-standup", f"DTSTART:{stamp(-14, 9, 0)}", f"DTEND:{stamp(-14, 9, 15)}",
          "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", f"EXDATE:{stamp(3, 9, 0)}",
-         "SUMMARY:Team check-in", "LOCATION:Microsoft Teams Meeting",
+         "SUMMARY:Team check-in", "LOCATION:Microsoft Teams Meeting", "CATEGORIES:Team",
          "DESCRIPTION:Join: https://teams.microsoft.com/l/meetup-join/demo"])
     add(["UID:demo-standup", f"RECURRENCE-ID:{stamp(1, 9, 0)}", f"DTSTART:{stamp(1, 9, 30)}",
-         f"DTEND:{stamp(1, 9, 45)}", "SUMMARY:Team check-in (moved)", "LOCATION:Microsoft Teams Meeting"])
+         f"DTEND:{stamp(1, 9, 45)}", "SUMMARY:Team check-in (moved)", "LOCATION:Microsoft Teams Meeting",
+         "CATEGORIES:Team"])
     add(["UID:demo-ops", f"DTSTART:{stamp(-7, 10, 0)}", f"DTEND:{stamp(-7, 11, 0)}",
          "RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO", "SUMMARY:Operations weekly", "LOCATION:Room 3.20"])
     add(["UID:demo-abc", f"DTSTART:{stamp(1, 13, 30)}", f"DTEND:{stamp(1, 15, 30)}",
-         "SUMMARY:Leadership meeting", "LOCATION:Boardroom"])
+         "SUMMARY:Leadership meeting", "LOCATION:Boardroom", "CATEGORIES:Leadership"])
     add(["UID:demo-tent", f"DTSTART:{stamp(1, 14, 0)}", f"DTEND:{stamp(1, 15, 0)}",
-         "SUMMARY:Process review working group", "X-MICROSOFT-CDO-BUSYSTATUS:TENTATIVE"])
+         "SUMMARY:Process review working group", "X-MICROSOFT-CDO-BUSYSTATUS:TENTATIVE",
+         "CATEGORIES:Projects"])
     add(["UID:demo-1on1", f"DTSTART:{stamp(2, 11, 0)}", f"DTEND:{stamp(2, 11, 30)}",
          "SUMMARY:1:1 with Priya", "LOCATION:Microsoft Teams Meeting"])
     add(["UID:demo-lunch", f"DTSTART:{stamp(2, 12, 30)}", f"DTEND:{stamp(2, 13, 30)}",
-         "SUMMARY:Lunch", "TRANSP:TRANSPARENT", "X-MICROSOFT-CDO-BUSYSTATUS:FREE"])
+         "SUMMARY:Lunch", "TRANSP:TRANSPARENT", "X-MICROSOFT-CDO-BUSYSTATUS:FREE",
+         "CATEGORIES:Personal"])
     add(["UID:demo-plan", f"DTSTART:{stamp(3, 9, 30)}", f"DTEND:{stamp(3, 12, 0)}",
-         "SUMMARY:Planning workshop: 2027 roadmap", "LOCATION:Level 2 meeting room"])
+         "SUMMARY:Planning workshop: 2027 roadmap", "LOCATION:Level 2 meeting room",
+         "CATEGORIES:Projects,Leadership"])
     add(["UID:demo-leave", f"DTSTART;VALUE=DATE:{day(4)}", f"DTEND;VALUE=DATE:{day(5)}",
          "SUMMARY:Working from the other office", "X-MICROSOFT-CDO-BUSYSTATUS:WORKINGELSEWHERE"])
     add(["UID:demo-exec", f"DTSTART:{stamp(4, 15, 0)}", f"DTEND:{stamp(4, 16, 0)}",
          "SUMMARY:Executive briefing prep", "LOCATION:Level 4 office"])
     add(["UID:demo-conf", f"DTSTART;VALUE=DATE:{day(2)}", f"DTEND;VALUE=DATE:{day(4)}",
-         "SUMMARY:Industry conference (Wed–Thu)"])
+         "CATEGORIES:Travel", "SUMMARY:Industry conference (Wed–Thu)"])
     add(["UID:demo-cancel", f"DTSTART:{stamp(0, 15, 0)}", f"DTEND:{stamp(0, 15, 30)}",
          "SUMMARY:Canceled: Vendor demo"])
     return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Planner demo//EN\r\n" + "\r\n".join(ev) + "\r\nEND:VCALENDAR\r\n"

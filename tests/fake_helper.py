@@ -120,9 +120,11 @@ for line in sys.stdin:
             send({"id": rid, "ok": False, "error": "Class not registered (0x80040154)"})
             continue
         row = {"id": "E1|x", "title": "Board", "start": req["start"] + "T10:00:00",
-               "end": req["start"] + "T11:00:00", "allDay": False, "location": "", "busy": 2}
+               "end": req["start"] + "T11:00:00", "allDay": False, "location": "", "busy": 2,
+               "categories": "Notes, Committees"}
         send({"id": rid, "ok": True, "connected": mode != "disconnected",
-              "connection": 400 if mode == "disconnected" else 700, "rows": [row]})
+              "connection": 400 if mode == "disconnected" else 700, "rows": [row],
+              "categoryColors": {"Notes": 0, "Committees": 21}})
     elif op in ("tagged", "put", "remove", "flush"):
         if mode == "error":
             send({"id": rid, "ok": False, "error": "Class not registered (0x80040154)"})

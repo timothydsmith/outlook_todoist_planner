@@ -108,6 +108,15 @@ a{color:var(--p3)}
 .blk.ev.busy-free{background:#EEF2F6;color:var(--ink-2);border:1px solid #C6D1DC}
 .blk.ev.busy-oof{background:#5B4A78}
 .blk.ev.busy-elsewhere{background:#E9EEF3;color:var(--ink);border:1px dashed var(--event)}
+/* Outlook category colours (--cat is set per event): solid when busy, a tint with a coloured edge otherwise */
+.blk.ev.cat,.chip.ev.cat{background-color:var(--cat);color:var(--ink)}
+.blk.ev.cat.cat-dark,.chip.ev.cat.cat-dark{color:#fff}
+.blk.ev.cat.busy-tentative{background-color:color-mix(in srgb,var(--cat) 30%,#fff);color:var(--ink);border:1px solid var(--cat)}
+.blk.ev.cat.busy-free{background:color-mix(in srgb,var(--cat) 18%,#fff);color:var(--ink-2);border:1px solid var(--cat)}
+.blk.ev.cat.busy-elsewhere{background:color-mix(in srgb,var(--cat) 24%,#fff);color:var(--ink);border:1px dashed var(--cat)}
+.chip.ev.cat.busy-tentative,.chip.ev.cat.busy-free,.chip.ev.cat.busy-elsewhere{background:color-mix(in srgb,var(--cat) 24%,#fff);color:var(--ink);box-shadow:inset 3px 0 0 var(--cat)}
+.cats{display:flex;align-items:center;gap:6px}
+.swatch{width:10px;height:10px;border-radius:3px;background:var(--cat);flex:0 0 auto}
 .blk.ev.cut-top{border-top-left-radius:0;border-top-right-radius:0}
 .blk.ev.cut-bottom{border-bottom-left-radius:0;border-bottom-right-radius:0}
 .cancelled .t{text-decoration:line-through}

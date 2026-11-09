@@ -4,6 +4,9 @@ All notable changes to Planner are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+- Meetings show their Outlook category colour, as they do in Outlook. Tentative and free meetings show a lighter shade with a coloured edge. A meeting's categories are listed in its details. Colours need "Outlook on this PC", because published calendar links don't include them.
+
 ## [1.1.0] - 2026-11-08
 
 ### Added
