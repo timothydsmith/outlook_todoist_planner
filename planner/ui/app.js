@@ -149,6 +149,15 @@ function taskInner(t, extraMeta) {
   return `<button class="check" data-complete="${esc(t.id)}" aria-label="Complete: ${esc(plain(t.content))}" title="Complete">${ICON.check}</button>` +
     `<span class="t">${esc(plain(t.content))}${t.due?.recurring ? ICON.recur : ""}</span>${extraMeta || ""}`;
 }
+// An Outlook category colour: the block's fill (or tint and border when tentative or free), with dark or
+// white text, whichever reads better on it.
+function catLook(ev) {
+  const m = /^#([0-9a-f]{6})$/i.exec(ev.color || "");
+  if (!m) return { cls: "", style: "" };
+  const lin = c => (c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  const n = parseInt(m[1], 16), L = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return { cls: ` cat${L < 0.23 ? " cat-dark" : ""}`, style: `--cat:#${m[1]};` };
+}
 function blockHTML(it) {
   const top = it.s / 60 * HOUR_PX, h = Math.max((it.e - it.s) / 60 * HOUR_PX - 2, 18);
   const w = 100 / it.ncol, left = it.col * w;
@@ -157,8 +166,9 @@ function blockHTML(it) {
   if (it.kind === "event") {
     const ev = it.ev, s = parseLocal(ev.start);
     const meta = size === "short" ? F.time.format(s) : esc([timeRange(s, parseLocal(ev.end)), ev.location].filter(Boolean).join(", "));
-    const cls = `blk ev busy-${esc(ev.busy)} ${size} ${ev.cancelled ? "cancelled" : ""} ${it.cutTop ? "cut-top" : ""} ${it.cutBottom ? "cut-bottom" : ""}`;
-    return `<div class="${cls}" style="${style}" data-ev="${esc(ev.id)}" tabindex="0" role="button"><span class="t">${esc(ev.title)}</span><span class="m">${meta}</span></div>`;
+    const look = catLook(ev);
+    const cls = `blk ev busy-${esc(ev.busy)}${look.cls} ${size} ${ev.cancelled ? "cancelled" : ""} ${it.cutTop ? "cut-top" : ""} ${it.cutBottom ? "cut-bottom" : ""}`;
+    return `<div class="${cls}" style="${look.style}${style}" data-ev="${esc(ev.id)}" tabindex="0" role="button"><span class="t">${esc(ev.title)}</span><span class="m">${meta}</span></div>`;
   }
   const t = it.t, day = parseYmd(t.due.date), s = atMinutes(day, it.s), e = atMinutes(day, it.e);
   const meta = `<span class="m">${size === "short" ? F.time.format(s) : esc(timeRange(s, e) + (t.project ? ", " + t.project : ""))}</span>`;
@@ -167,8 +177,8 @@ function blockHTML(it) {
 }
 function chipHTML(it) {
   if (it.kind === "event") {
-    const ev = it.ev;
-    return `<div class="chip ev busy-${esc(ev.busy)} ${ev.cancelled ? "cancelled" : ""}" data-ev="${esc(ev.id)}" tabindex="0" role="button"><span class="t">${esc(ev.title)}</span></div>`;
+    const ev = it.ev, look = catLook(ev);
+    return `<div class="chip ev busy-${esc(ev.busy)}${look.cls} ${ev.cancelled ? "cancelled" : ""}" style="${look.style}" data-ev="${esc(ev.id)}" tabindex="0" role="button"><span class="t">${esc(ev.title)}</span></div>`;
   }
   return `<div class="chip task ${prioClass(it.t.priority)}" data-task="${esc(it.t.id)}" tabindex="0" role="button">${taskInner(it.t)}</div>`;
 }
@@ -364,8 +374,10 @@ function showEvent(ev, anchor) {
       ? `${F.dayLong.format(s)}, ${timeRange(s, e)}` : `${F.dayShort.format(s)} ${F.time.format(s)} to ${F.dayShort.format(e)} ${F.time.format(e)}`;
   }
   const join = ev.url ? `<div class="actions"><a class="btn primary" href="${esc(ev.url)}" target="_blank" rel="noopener">Join meeting</a></div>` : "";
+  const look = catLook(ev), cats = ev.categories || [];
+  const catLine = cats.length ? `<p class="cats">${look.style ? `<span class="swatch" style="${look.style}" aria-hidden="true"></span>` : ""}${esc(cats.join(", "))}</p>` : "";
   openPop(`<h3>${esc(ev.title)}</h3><p>${esc(when)}</p>${ev.location ? `<p>${esc(ev.location)}</p>` : ""}` +
-    `<p>${esc(BUSY_LABEL[ev.busy] || "Busy")}${ev.cancelled ? ", cancelled" : ""}</p>${join}` +
+    `<p>${esc(BUSY_LABEL[ev.busy] || "Busy")}${ev.cancelled ? ", cancelled" : ""}</p>${catLine}${join}` +
     `<p class="note">From Outlook. Edit it in Outlook.</p>`, anchor);
 }
 const PRIO_LABEL = { 4: "Priority 1", 3: "Priority 2", 2: "Priority 3", 1: "No priority" };
@@ -555,6 +567,7 @@ function openSettings(intro = false) {
   form.elements.show_weekends.checked = s.show_weekends !== false;
   form.elements.outlook_writeback.checked = !!s.outlook_writeback;
   form.elements.outlook_show_as.value = s.outlook_show_as || "busy";
+  form.elements.theme.value = s.theme || "system";
   const daysSel = form.elements.outlook_writeback_days, days = String(s.outlook_writeback_days ?? 14);
   if (![...daysSel.options].some(o => o.value === days)) daysSel.add(new Option(`${days} days ahead`, days));
   daysSel.value = days;
@@ -570,7 +583,13 @@ function syncIcsField() {
   f.outlook_show_as.disabled = f.outlook_writeback_days.disabled = !desktop || !f.outlook_writeback.checked;
   $("#writebackNeeds").hidden = desktop;
 }
-form.addEventListener("change", e => { if (e.target.name === "calendar_source" || e.target.name === "outlook_writeback") syncIcsField(); });
+form.addEventListener("change", e => {
+  if (e.target.name === "calendar_source" || e.target.name === "outlook_writeback") syncIcsField();
+  if (e.target.name === "theme") applyTheme(e.target.value);  // preview it while Settings is open
+});
+// The page arrives with the saved theme already set (the server fills it in); Cancel puts it back.
+function applyTheme(theme) { document.documentElement.dataset.theme = ["light", "dark"].includes(theme) ? theme : "system"; }
+dlg.addEventListener("close", () => applyTheme(state.settings?.theme));
 form.addEventListener("submit", async e => {
   if (e.submitter && e.submitter.value === "cancel") return;
   e.preventDefault();
@@ -586,6 +605,7 @@ form.addEventListener("submit", async e => {
     show_weekends: f.show_weekends.checked,
     outlook_writeback: f.outlook_writeback.checked && src === "outlook_desktop",
     outlook_show_as: f.outlook_show_as.value, outlook_writeback_days: Number(f.outlook_writeback_days.value),
+    theme: f.theme.value,
   };
   const s = state.settings || {};
   if (s.outlook_writeback && s.calendar_source === "outlook_desktop" && !body.outlook_writeback &&

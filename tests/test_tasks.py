@@ -193,6 +193,14 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(again.get("ics_url"), "https://x/cal.ics")
         self.assertFalse(self.path.with_suffix(".tmp").exists())
 
+    def test_theme(self):
+        cfg = config.Config(self.path)
+        self.assertEqual(cfg.get("theme"), "system")
+        cfg.update({"theme": "dark"})
+        self.assertEqual(cfg.get("theme"), "dark")
+        cfg.update({"theme": "purple"})
+        self.assertEqual(cfg.get("theme"), "system")
+
     def test_values_are_clamped_and_unknown_keys_dropped(self):
         cfg = config.Config(self.path)
         cfg.update({"day_start_hour": 30, "default_task_minutes": 1, "refresh_minutes": 999,

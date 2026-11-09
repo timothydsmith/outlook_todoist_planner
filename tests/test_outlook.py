@@ -148,6 +148,7 @@ class OutlookCalendarTests(unittest.TestCase):
         evs = cal.events(d, d + dt.timedelta(days=1), force=False)
         cal.events(d, d + dt.timedelta(days=1), force=False)
         self.assertEqual([e["title"] for e in evs], ["Board"])
+        self.assertEqual((evs[0]["categories"], evs[0]["color"]), (["Notes", "Committees"], "#329B7A"))
         self.assertEqual(self.events_requests(), 1)
         self.assertEqual(cal.notices(), [])
         cal.events(d, d + dt.timedelta(days=1), force=True)
